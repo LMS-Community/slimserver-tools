@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # 
-# Translates slimp3 skins from Slimp3 Server 4.2.2 and before to 
-# new format for Slimserver 5.0 and beyond.
+# Translates slimp3 skins for SLIMP3 Server to 
+# new format for Slim Server 5.0 and beyond.
 #
 # Renames slimp3.css to slimserver.css and edits all html files
 # for perl module references and css references.
@@ -54,9 +54,13 @@ my %convertlist =	(
 	"SliMP3::Control::pause.(.*?).;" =>					"->pause();",
 	"SliMP3::Control::playout.(.*?).;" =>				"->playout();",
 	"SliMP3::Control::maxVolume" =>		"Slim::Player::Client::maxVolume",
+
 	"SliMP3::Control::maxTreble" =>		"Slim::Player::Client::maxTreble",
+
 	"SliMP3::Control::minTreble" =>		"Slim::Player::Client::minTreble",
+
 	"SliMP3::Control::maxBass" =>			"Slim::Player::Client::maxBass",
+
 	"SliMP3::Control::minBass" =>			"Slim::Player::Client::minBass",
 	"SliMP3::Discovery" =>			"Slim::Networking::Discovery",
 	"use SliMP3::Playlist"	=>		"use Slim::Player::Playlist;\nuse Slim::Player::Source;\nuse Slim::Player::Sync",

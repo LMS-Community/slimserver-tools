@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
-# SLIMP3 Server Copyright (C) 2001 Sean Adams, Slim Devices Inc.
+# Slim Server Copyright (C) 2003 Sean Adams, Slim Devices Inc.
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License,
 # version 2.
 
 #
-# Command line interface for the controlling the SLIMP3
+# Command line interface for the controlling the Slim Server
 #
 
 use strict;
@@ -105,8 +105,8 @@ sub showUsage {
 Usage: $0 --httpaddr <host|ip> --httpport <port> --command <command> 
           [--p1 <arg>] [--p2 <arg>] [--p3 <arg>] [--p4 <arg>] [--player <playerid>]
 
-        --httpaddr  => The hostname or ip address of the SLIMP3 web server
-	--httpport  => The port on which the SLIMP3 web server is listening
+        --httpaddr  => The hostname or ip address of the Slim web server
+	--httpport  => The port on which the Slim web server is listening
 	--command   => Pick from the 1st column of the list below
         --p1        => Pick from the 2st column of the list below
         --p2        => Pick from the 3rd column of the list below

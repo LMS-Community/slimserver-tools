@@ -3,7 +3,7 @@ SlimServer Tools
 This directory contains several scripts to work along with the slimserver software.
 
 -skinjob.pl
-	Use this tool to convert skins made for Slimp3 Server (4.2.3 and earlier).  The syntax is 
+	Use this tool to convert skins made for SLIMP3 Server (versions before 5.0).  The syntax is 
 	as follows:
 	skinjob.pl <skinname> where skinname is an optional argument for the skin you wish to change.  
 	If no argument, it will start with the current directory.  If you run this from the root 
@@ -54,7 +54,7 @@ This directory contains several scripts to work along with the slimserver softwa
 	Result is stored in out.txt
 
 -whack.pl
-	Use this tool to convert old plugins (Slimp3 Server 4.2.3 or earlier) to 
+	Use this tool to convert old plugins (made for SLIMP3 Server versions below 5.0) to 
 	SlimServer plugins.  The syntax for the command is as follows:
 	whack.pl myplugin.pm...
 	This will rewrite myplugin.pm (and any other specified files), leaving
