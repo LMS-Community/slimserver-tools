@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# SlimServer Copyright (C) 2003 Sean Adams, Slim Devices Inc.
+# SlimServer Copyright (C) 2003-2004 Sean Adams, Slim Devices Inc.
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License,
 # version 2.
