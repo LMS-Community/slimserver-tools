@@ -20,6 +20,7 @@ struct stream *io_stream_alloc(void) {
 	s->tail = NULL;
 	s->bytes_in = 0;
 	s->bytes_out = 0;
+	s->bytes_buffered_on_client = 224000;  // initial estimate - tuned as we receive sync packets
 }
 
 

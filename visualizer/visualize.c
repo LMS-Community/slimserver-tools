@@ -11,7 +11,7 @@
 #include "io.h"
 #include "visualize.h"
 
-#define HISTORY_WIDTH  64
+#define HISTORY_WIDTH  128
 
 void visualize (struct audio_chunk *chunk) {
 
@@ -62,7 +62,7 @@ void visualize (struct audio_chunk *chunk) {
 		rms[chan] = sqrt(rms[chan]);
 	}
 
-	fprintf(stderr, "rms: %f, %f\n", rms[0], rms[1]);
+//	fprintf(stderr, "rms: %f, %f\n", rms[0], rms[1]);
 
 	// draw graphic
 

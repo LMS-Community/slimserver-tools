@@ -11,7 +11,7 @@ struct audio_chunk {
 struct stream {
 	struct audio_chunk *head, *tail;
 
-	unsigned long long bytes_in, bytes_out;
+	unsigned long long bytes_in, bytes_out, bytes_buffered_on_client;
 };
 
 

@@ -21,6 +21,7 @@ int main (int argv, char *argc[]) {
 	char *infile_name = argc[2];
 	int in_fd;
 	struct audio_chunk *chunk;
+	int i=0;
 
 	struct stream *s;
 
@@ -41,17 +42,16 @@ int main (int argv, char *argc[]) {
 	s = io_stream_alloc();
 
 	
-
 	while (io_pass_through_and_enqueue(in_fd, STDOUT_FILENO, s)) {
 		fprintf(stderr, "in: %lld, out: %lld\n", s->bytes_in, s->bytes_out);
 		
-		if ( (s->bytes_in - s->bytes_out) >= 224000 ) {
+		if ( (s->bytes_in - s->bytes_out) >= s-> bytes_buffered_on_client ) {
 			chunk = io_dequeue_chunk(s);
 			visualize(chunk);
 			free(chunk);
 		}
-
-		select(0, NULL, NULL, NULL, &tv);
+		
+//		select(0, NULL, NULL, NULL, &tv);
 	}
 
 }
