@@ -583,16 +583,22 @@ WMAReader::StartReading() {
         if ((pFormat->wFormatTag == WAVE_FORMAT_PCM) &&
             (pFormat->nSamplesPerSec == m_dwSamplesPerSec) &&
             (pFormat->wBitsPerSample == m_wBitsPerSample)) {
-          bFoundMatch = TRUE;
-          hr = m_pReader->SetOutputProps(m_dwOutputNum, pOutputProps);
-          if (FAILED(hr)) {
-            fprintf(stderr, "Setting audio output properties failed "
-                    "with error code 0x%x\n", hr);
-            break;
-          }
-          if (pFormat->nChannels == 1 &&
-              m_dwNumChannels == 2) {
-            m_bMakeStereo = TRUE;
+          if ((pFormat->nChannels == m_dwNumChannels) ||
+              !bFoundMatch) {
+            bFoundMatch = TRUE;
+            hr = m_pReader->SetOutputProps(m_dwOutputNum, pOutputProps);
+            if (FAILED(hr)) {
+              fprintf(stderr, "Setting audio output properties failed "
+                      "with error code 0x%x\n", hr);
+              break;
+            }
+            if (pFormat->nChannels == 1 &&
+                m_dwNumChannels == 2) {
+              m_bMakeStereo = TRUE;
+            }
+            else {
+              m_bMakeStereo = FALSE;
+            }
           }
         }
       }
