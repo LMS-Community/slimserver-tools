@@ -193,6 +193,11 @@ static pascal Boolean SoundConverterFillBufferDataProc(SoundComponentDataPtr *ou
         
         pFillData->currentTime += convertTime(getDataParams.actualSampleCount, (pFillData->compData.desc.sampleRate >> 16), pFillData->timescale) * getDataParams.durationPerSample;
         
+		// Indicate whether we have more data in the source file. This is redundant with 
+		// some of the other checks we do above, but proves to be necessary in some cases
+		// (crashes were reported with Apple Lossless encoded files, for example).
+		pFillData->isThereMoreSource = (pFillData->currentTime < pFillData->duration);
+
         // sampleCount is the number of PCM samples
         pFillData->compData.desc.sampleCount = getDataParams.actualSampleCount;
         
