@@ -123,7 +123,8 @@ my %convertlist =	(
 	"SliMP3::Olson" =>			"Slim::Web::Olson",
 	"SliMP3::Pages" =>			"Slim::Web::Pages",
 	"SliMP3::RemoteStream" =>	"Slim::Web::RemoteStream",
-	"SliMP3::Setup" =>			"Slim::Web::Setup"
+	"SliMP3::Setup" =>			"Slim::Web::Setup",
+	"slimp3.css" =>	"slimserver.css"
 	);
 	
 @ARGV = qw(.) unless @ARGV;
