@@ -32,7 +32,7 @@ sub main {
 		'p1=s'		=> \$p1,
 		'p2=s'		=> \$p2,
 		'p3=s'		=> \$p3,
-		'p4=s'		=> \$p3,
+		'p4=s'		=> \$p4,
 	);
 
 	
@@ -42,7 +42,7 @@ sub main {
 		showUsage();
 	}
 	else {
-		executeCommand($httpaddr, $httpport, [$player, $command, $p1, $p2, $p3, $p4]);
+		executeCommand($httpaddr, $httpport, $player, $command, $p1, $p2, $p3, $p4);
 	}
 
 } # end sub main
@@ -62,31 +62,31 @@ sub main {
 	#		http://host/status.html?p0=mixer&p1=volume&p2=11&player=10.0.1.203:69
 	#
 sub executeCommand {
-	my ($httpaddr, $httpport, $player, $command, $p1, $p2, $p3) = @_;
-	my $urlstring;
+    my ($httpaddr, $httpport, $player, $command, $p1, $p2, $p3, $p4) = @_;
+    my $urlstring = undef;
 	my $content = undef;
 	
 	$urlstring = "http://$httpaddr:$httpport/status?p0=$command";
 
-	if ( defined($p1) ) {
-		$urlstring .= "&p1=" . $p1;
-	}
+    if ( defined($p1) ) {
+        $p1 =~s/([^a-zA-Z0-9_\-.])/uc sprintf("%%%02x",ord($1))/eg;
+            $urlstring .= "&p1=" . $p1;
+    }
 
-	if ( defined($p2) ) {
-		$urlstring .= "&p2=" . $p2;
-	}
+    if ( defined($p2) ) {
+        $p2 =~s/([^a-zA-Z0-9_\-.])/uc sprintf("%%%02x",ord($1))/eg;
+            $urlstring .= "&p2=" . $p2;
+    }
 
-	if ( defined($p3) ) {
-		$urlstring .= "&p3=" . $p3;
-	}
+    if ( defined($p3) ) {
+        $p3 =~s/([^a-zA-Z0-9_\-.])/uc sprintf("%%%02x",ord($1))/eg;
+            $urlstring .= "&p3=" . $p3;
+    }
 
-	if ( defined($p4) ) {
-		$urlstring .= "&p4=" . $p4;
-	}
-
-	if ( defined($player) ) {
-		$urlstring .= "&player=" . $player;
-	}
+    if ( defined($p4) ) {
+        $p4 =~s/([^a-zA-Z0-9_\-.])/uc sprintf("%%%02x",ord($1))/eg;
+            $urlstring .= "&p4=" . $p4;
+    }
 
 	$urlstring .= "\n";
 	unless (defined ($content = get($urlstring))) {
