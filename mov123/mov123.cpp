@@ -30,11 +30,13 @@
 //
 //  Portions based on Apple's ConvertMovieSndTrack sample code.
 //
+//  Modified by Henry Mason to use MovieExport Data Procs 
+//      (modification based on Adrian Bourke's (adrianb@bigpond.net.au) "Modified ConvertMovieSndTrack")
 
 #include <stdio.h>
 #include <fcntl.h>
 
-#include <io.h>
+//#include <io.h>
 
 
 #ifdef WIN32
@@ -55,15 +57,16 @@ const UInt32 kMaxBufferSize =  64 * 1024;  // max size of input buffer
 OSErr ConvertMovieSndTrack(const char* inFileToConvert);
 
 typedef struct {
-	ExtendedSoundComponentData	compData;
-	Handle						hSource;			// source media buffer
-	Media						sourceMedia;		// sound media identifier
-	TimeValue					getMediaAtThisTime;
-	TimeValue					sourceDuration;
-
-	UInt32						maxBufferSize;
-	Boolean						isThereMoreSource;
-	Boolean						isSourceVBR;
+    ExtendedSoundComponentData 	compData;
+    TimeValue 					currentTime;
+    TimeValue 					duration;
+    TimeValue 					timescale;
+    Boolean 					isThereMoreSource;
+    Boolean 					isSourceVBR;
+    MovieExportGetDataUPP 		getDataProc;
+    MovieExportGetPropertyUPP 	getPropertyProc;
+    void 						*refCon;
+    long 						trackID;
 } SCFillBufferData, *SCFillBufferDataPtr;
 
 FILE* outFile;
@@ -110,6 +113,22 @@ int main(int argc, char *argv[])
 #endif
 
 
+static TimeValue convertTime(TimeValue originalTime, TimeValue originalTimescale, TimeValue newTimescale)
+{
+    TimeValue newTime = 0;
+    TimeRecord timeRecord;
+    
+    
+    timeRecord.value.hi = 0;
+    timeRecord.value.lo = originalTime;
+    timeRecord.scale = originalTimescale;
+    timeRecord.base = NULL;
+    ConvertTimeScale(&timeRecord, newTimescale);	
+    newTime = timeRecord.value.lo;
+    
+    return newTime;
+}
+
 // * ----------------------------
 // SoundConverterFillBufferDataProc
 //
@@ -117,193 +136,71 @@ int main(int argc, char *argv[])
 // outData to a pointer to a properly filled out ExtendedSoundComponentData structure
 static pascal Boolean SoundConverterFillBufferDataProc(SoundComponentDataPtr *outData, void *inRefCon)
 {
-	SCFillBufferDataPtr pFillData = (SCFillBufferDataPtr)inRefCon;
+    SCFillBufferDataPtr pFillData = (SCFillBufferDataPtr)inRefCon;
+    
+    OSErr err;
+    
+    // if after getting the last chunk of data the total time is over the duration, we're done
+    if (pFillData->currentTime >= pFillData->duration) {
+        pFillData->isThereMoreSource = false;
+        pFillData->compData.desc.buffer = NULL;
+        pFillData->compData.desc.sampleCount = 0;
+        pFillData->compData.bufferSize = 0;		
+        pFillData->compData.commonFrameSize = 0;
+    }
+    
+    if (pFillData->isThereMoreSource) {
 	
-	OSErr err;
-							
-	// if after getting the last chunk of data the total time is over the duration, we're done
-	if (pFillData->getMediaAtThisTime >= pFillData->sourceDuration) {
-		pFillData->isThereMoreSource = false;
-		pFillData->compData.desc.buffer = NULL;
-		pFillData->compData.desc.sampleCount = 0;
-		pFillData->compData.bufferSize = 0;		
-		pFillData->compData.commonFrameSize = 0;
-	}
-	
-	if (pFillData->isThereMoreSource) {
-	
-		long	  sourceBytesReturned;
-		long	  numberOfSamples;
-		TimeValue sourceReturnedTime, durationPerSample;
-		
-		// in calling GetMediaSample, we'll get a buffer that consists of equal sized frames - the
-		// degenerate case is only 1 frame -- for non-self-framed vbr formats (like AAC in QT 6)
-		// we need to provide some more framing information - either the frameCount, frameSizeArray pair or
-		// the commonFrameSize field must be valid -- because we always get equal sized frames, we can use
-		// commonFrameSize and set the kExtendedSoundCommonFrameSizeValid flag -- if there is
-		// only 1 frame then (common frame size == media sample size), if there are multiple frames,
-		// then (common frame size == media sample size / number of frames).
-		
-		err = GetMediaSample(pFillData->sourceMedia,		// specifies the media for this operation
-							 pFillData->hSource,			// function returns the sample data into this handle
-							 pFillData->maxBufferSize,		// maximum number of bytes of sample data to be returned
-							 &sourceBytesReturned,			// the number of bytes of sample data returned
-							 pFillData->getMediaAtThisTime,	// starting time of the sample to be retrieved (must be in Media's TimeScale)
-							 &sourceReturnedTime,			// indicates the actual time of the returned sample data
-							 &durationPerSample,			// duration of each sample in the media
-							 NULL,							// sample description corresponding to the returned sample data (NULL to ignore)
-							 NULL,							// index value to the sample description that corresponds to the returned sample data (NULL to ignore)
-							 0,								// maximum number of samples to be returned (0 to use a value that is appropriate for the media)
-							 &numberOfSamples,				// number of samples it actually returned
-							 NULL);							// flags that describe the sample (NULL to ignore)
-
-		if ((noErr != err) || (sourceBytesReturned == 0)) {
-			pFillData->isThereMoreSource = false;
-			pFillData->compData.desc.buffer = NULL;
-			pFillData->compData.desc.sampleCount = 0;
-			pFillData->compData.bufferSize = 0;		
-			pFillData->compData.commonFrameSize = 0;
-			
-			if ((err != noErr) && (sourceBytesReturned > 0))
-				printf("GetMediaSample - Failed in FillBufferDataProc");
-		}
-
-		pFillData->getMediaAtThisTime = sourceReturnedTime + (durationPerSample * numberOfSamples);
-		
-		// sampleCount is the number of PCM samples
-		pFillData->compData.desc.sampleCount = numberOfSamples * durationPerSample;
-		
-		// kExtendedSoundBufferSizeValid was specified - make sure this field is filled in correctly
-		pFillData->compData.bufferSize = sourceBytesReturned;
-		
-		// for VBR audio we specified the kExtendedSoundCommonFrameSizeValid flag - make sure this field is filled in correctly
-		if (pFillData->isSourceVBR) pFillData->compData.commonFrameSize = sourceBytesReturned / numberOfSamples;
-	}
-
-	// set outData to a properly filled out ExtendedSoundComponentData struct
-	*outData = (SoundComponentDataPtr)&pFillData->compData;
-	
-	return (pFillData->isThereMoreSource);
-}
-
-// * ----------------------------
-// GetMovieMedia
-//
-// returns a Media identifier - if the file is a System 7 Sound a non-in-place import is done and
-// a handle to the data is passed back to the caller who is responsible for disposing of it
-static OSErr GetMovieMedia(const char* inFile, Movie *outMovie, Media *outMedia)
-{
-	Movie theMovie = 0;
-	Track theTrack;
-	short theRefNum;
-	short theResID = 0;	// we want the first movie
-	OSErr err = noErr;
-
-	BailErr(err);
-		
-	Boolean wasChanged;
-	
-	// open the movie file
-	if (strncmp(inFile, "http:", strlen("http:")) &&
-		strncmp(inFile, "rtsp:", strlen("rtsp:")) &&
-		strncmp(inFile, "ftp:", strlen("ftp:") )) {
-		FSSpec		theFSSpec;
-#ifdef WIN32
-		OSErr result = NativePathNameToFSSpec((char*)inFile, &theFSSpec, 0 /* flags */);
-#else
-                FSRef ref; // intermediate struct
-                FSPathMakeRef( (const UInt8*)inFile, &ref, NULL );
-                OSErr result = FSGetCatalogInfo( &ref, kFSCatInfoNone , NULL, NULL, &theFSSpec, NULL);
-#endif
-		if (result) {printf("NativePathNameToFSSpec failed on source file %s with %d\n", inFile, result); goto bail; }
-		err = OpenMovieFile(&theFSSpec, &theRefNum, fsRdPerm);
-		// instantiate the movie
-		BailErr(err);
-		err = NewMovieFromFile(&theMovie, theRefNum, &theResID, NULL, newMovieActive, &wasChanged);
-		CloseMovieFile(theRefNum);
-	} else {
-
-		Handle urlDataRef; 
-		
-		urlDataRef = NewHandle(strlen(inFile) + 1); 
-		if ( ( err = MemError()) != noErr) goto bail; 
-		
-		BlockMoveData(inFile, *urlDataRef, strlen(inFile) + 1); 
-		
-		err = NewMovieFromDataRef(&theMovie, newMovieActive, nil, urlDataRef, URLDataHandlerSubType); 
-		if (err) {printf("NewMovieFrom Data Ref failed on source file %s with %d\n", inFile, err); goto bail; }
-
-		DisposeHandle(urlDataRef); 
-		
-	}
-
-	BailErr(err);
-	
-	// get the first sound track
-	theTrack = GetMovieIndTrackType(theMovie, 1, SoundMediaType, movieTrackMediaType);
-	if (NULL == theTrack ) BailErr(invalidTrack);
-
-	// get and return the sound track media
-	*outMedia = GetTrackMedia(theTrack);
-	if (NULL == *outMedia) err = invalidMedia;
-	
-	*outMovie = theMovie;
-	
-bail:
-	return err;
-}
-
-// * ----------------------------
-// GetSoundDescriptionInfo
-//
-// this function will extract the information needed to decompress the sound file, this includes 
-// retrieving the sample description and the decompression atom saved as a Sample Description Extention
-static OSErr GetSoundDescriptionInfo(Media inMedia, Ptr *outAudioAtom, SoundDescriptionPtr outSoundDesc)
-{
-	OSErr err = noErr;
-			
-	Size size;
-	Handle extension = NULL;
-	SoundDescriptionHandle hSoundDescription = (SoundDescriptionHandle)NewHandle(0);
-	
-	// get the description of the sample data
-	GetMediaSampleDescription(inMedia, 1, (SampleDescriptionHandle)hSoundDescription);
-	BailErr(GetMoviesError());
-
-	extension = NewHandle(0);
-	BailErr(MemError());
-	
-	// get the "magic" decompression atom
-	// This extension to the SoundDescription information stores data specific to a given audio decompressor.
-	// Some audio decompression algorithms require a set of out-of-stream values to configure the decompressor
-	// which are stored in a siDecompressionParams atom. The contents of the siDecompressionParams atom are dependent
-	// on the sound decompressor.
-	err = GetSoundDescriptionExtension(hSoundDescription, &extension, siDecompressionParams);
-	if (noErr == err) {
-		size = GetHandleSize(extension);
-		HLock(extension);
-		*outAudioAtom = NewPtr(size);
-		BailErr(MemError());
-		// copy the atom data to our Ptr...
-		BlockMoveData(*extension, *outAudioAtom, size);
-		HUnlock(extension);
-	} else {
-		// if it doesn't have an atom, that's ok
-		err = noErr;
-	}
-	
-	// set up our sound header
-	outSoundDesc->dataFormat = (*hSoundDescription)->dataFormat;
-	outSoundDesc->numChannels = (*hSoundDescription)->numChannels;
-	outSoundDesc->sampleSize = (*hSoundDescription)->sampleSize;
-	outSoundDesc->sampleRate = (*hSoundDescription)->sampleRate;
-	outSoundDesc->compressionID = (*hSoundDescription)->compressionID;
-	
-bail:
-	if (extension) DisposeHandle(extension);
-	if (hSoundDescription) DisposeHandle((Handle)hSoundDescription);
-	
-	return err;
+        MovieExportGetDataParams getDataParams;
+        
+        
+        getDataParams.recordSize = sizeof(MovieExportGetDataParams);
+        getDataParams.trackID = pFillData->trackID;
+        getDataParams.requestedTime = pFillData->currentTime;
+        getDataParams.sourceTimeScale = pFillData->timescale;
+        getDataParams.actualTime = 0;
+        getDataParams.dataPtr = NULL;
+        getDataParams.dataSize = 0;
+        getDataParams.desc = NULL;
+        getDataParams.descType = 0;
+        getDataParams.descSeed = 0;
+        getDataParams.requestedSampleCount = 0;
+        getDataParams.actualSampleCount = 0;
+        getDataParams.durationPerSample = 0;
+        getDataParams.sampleFlags = 0; 
+        
+        err = InvokeMovieExportGetDataUPP(pFillData->refCon, &getDataParams, pFillData->getDataProc);
+        
+        if ((noErr != err) || (getDataParams.dataSize == 0)) {
+            pFillData->isThereMoreSource = false;
+            pFillData->compData.desc.buffer = NULL;
+            pFillData->compData.desc.sampleCount = 0;
+            pFillData->compData.bufferSize = 0;		
+            pFillData->compData.commonFrameSize = 0;
+            
+            if ((err != noErr) && (getDataParams.dataSize > 0))
+                DebugStr("\pInvokeMovieExportGetDataUPP - Failed in FillBufferDataProc");
+        }
+        
+        pFillData->currentTime += convertTime(getDataParams.actualSampleCount, (pFillData->compData.desc.sampleRate >> 16), pFillData->timescale) * getDataParams.durationPerSample;
+        
+        // sampleCount is the number of PCM samples
+        pFillData->compData.desc.sampleCount = getDataParams.actualSampleCount;
+        
+        // point to our sound data
+        pFillData->compData.desc.buffer = (unsigned char *)getDataParams.dataPtr;
+        
+        // kExtendedSoundBufferSizeValid was specified - make sure this field is filled in correctly
+        pFillData->compData.bufferSize = getDataParams.dataSize;
+        
+        // for VBR audio we specified the kExtendedSoundCommonFrameSizeValid flag - make sure this field is filled in correctly
+        if (pFillData->isSourceVBR) pFillData->compData.commonFrameSize = getDataParams.dataSize / pFillData->compData.desc.sampleCount;
+    }
+    
+    // set outData to a properly filled out ExtendedSoundComponentData struct
+    *outData = (SoundComponentDataPtr)&pFillData->compData;
+    
+    return (pFillData->isThereMoreSource);
 }
 
 // * ----------------------------
@@ -312,289 +209,389 @@ bail:
 // this function does the actual work
 OSErr ConvertMovieSndTrack(const char* inFileToConvert)
 {
-	SoundConverter			 mySoundConverter = NULL;
-	
-	Movie					 theSrcMovie = 0;
-	Media					 theSrcMedia = 0;
-							
-	Ptr						 theDecompressionParams = NULL;
-	Handle 					 theCompressionParams = NULL;
-
-	SoundDescription		 theSrcInputFormatInfo;
-	SoundDescriptionV1Handle hSoundDescription = NULL;
-	UnsignedFixed 			 theOutputSampleRate;
-	SoundComponentData		 theInputFormat,
+    SoundConverter			 mySoundConverter = NULL;
+    
+    Movie					 theSrcMovie = 0;
+    
+    Handle					 hSys7SoundData = NULL;
+    
+    Ptr						 theDecompressionParams = NULL;
+    Handle 					 theCompressionParams = NULL;
+    
+    SoundDescription		 theSrcInputFormatInfo;
+    SoundDescriptionV1Handle hSoundDescription = NULL;
+    UnsignedFixed 			 theOutputSampleRate;
+    SoundComponentData		 theInputFormat,
 							 theOutputFormat;
-
-	SCFillBufferData 		 scFillBufferData = { NULL };
-	Ptr						 pDecomBuffer = NULL;
-										
-	Boolean					 isSoundDone = false;
+    
+    SCFillBufferData 		 scFillBufferData = { NULL };
+    Ptr						 pDecomBuffer = NULL;
+    
+    Boolean					 isSoundDone = false;
+    
+    OSErr 					 err = noErr;
+    
+    ComponentInstance		 componentInstance = NULL;
+    ComponentDescription	 compDesc;
+    MovieExportGetDataParams getDataParams;
+    
+    UInt32 inputBytes, outputBytes, maxPacketSize;
+    Boolean outputFormatIsVBR;
+    
+    CompressionInfo compressionFactor;
+    
+    if (strncmp(inFileToConvert, "http:", strlen("http:")) &&
+        strncmp(inFileToConvert, "rtsp:", strlen("rtsp:")) &&
+        strncmp(inFileToConvert, "ftp:", strlen("ftp:") )) {
+        
+        short theRefNum;
+        short theResID = 0;	// we want the first movie
+        Boolean wasChanged;
+        
+        FSSpec		theFSSpec;
+        
+#ifdef WIN32
+        OSErr result = NativePathNameToFSSpec((char*)inFileToConvert, &theFSSpec, 0 /* flags */);
+#else
+        FSRef ref; // intermediate struct
+        FSPathMakeRef( (const UInt8*)inFileToConvert, &ref, NULL );
+        OSErr result = FSGetCatalogInfo( &ref, kFSCatInfoNone , NULL, NULL, &theFSSpec, NULL);
+#endif
+        if (result) {printf("NativePathNameToFSSpec failed on source file %s with %d\n", inFileToConvert, result); goto bail; }
+        
+        // open the movie file
+        err = OpenMovieFile(&theFSSpec, &theRefNum, fsRdPerm);
+        BailErr(err);
+        
+        // instantiate the movie
+        err = NewMovieFromFile(&theSrcMovie, theRefNum, &theResID, NULL, newMovieActive, &wasChanged);
+        CloseMovieFile(theRefNum);
+        BailErr(err);
+        
+    } else {
+        
+        Handle urlDataRef; 
+        
+        urlDataRef = NewHandle(strlen(inFileToConvert) + 1); 
+        if ( ( err = MemError()) != noErr) goto bail; 
+        
+        BlockMoveData(inFileToConvert, *urlDataRef, strlen(inFileToConvert) + 1); 
+        
+        err = NewMovieFromDataRef(&theSrcMovie, newMovieActive, nil, urlDataRef, URLDataHandlerSubType); 
+        if (err) {printf("NewMovieFrom Data Ref failed on source file %s with %d\n", inFileToConvert, err); goto bail; }
+        
+        DisposeHandle(urlDataRef); 
+        
+    }
+    
+    // *********** MOVIE: Find our Movie
+    
+    if (theSrcMovie)
+    {
+        
+	// *********** MOVIEEXPORT DATA AND PROPERTIES PROCS: Set up the data source
 	
-	OSErr 					 err = noErr;
-	
-	// *********** SOURCE: Get sound data info from the first source movie sound track
-	
-	err = GetMovieMedia(inFileToConvert, &theSrcMovie, &theSrcMedia);
-	BailErr(err);
-	
-	err = GetSoundDescriptionInfo(theSrcMedia, (Ptr *)&theDecompressionParams, &theSrcInputFormatInfo);
-	if (noErr == err) {		
-		// setup input format for sound converter
-		theInputFormat.flags = 0;
-		theInputFormat.format = theSrcInputFormatInfo.dataFormat;
-		theInputFormat.numChannels = theSrcInputFormatInfo.numChannels;
-		theInputFormat.sampleSize = theSrcInputFormatInfo.sampleSize;
-		theInputFormat.sampleRate = theSrcInputFormatInfo. sampleRate;
-		theInputFormat.sampleCount = 0;
-		theInputFormat.buffer = NULL;
-		theInputFormat.reserved = 0;
-
-		theOutputFormat.flags = kNoRealtimeProcessing;
-		theOutputFormat.format = k16BitBigEndianFormat;
-		theOutputFormat.numChannels = 2; // theInputFormat.numChannels;
-		theOutputFormat.sampleSize = 16;
-		theOutputFormat.sampleRate = 44100 << 16; //theInputFormat.sampleRate;
-		theOutputFormat.sampleCount = 0;
-		theOutputFormat.buffer = NULL;
-		theOutputFormat.reserved = 0;
-
+        compDesc.componentType = MovieExportType;
+        compDesc.componentSubType = kQTFileTypeMovie;
+        compDesc.componentManufacturer = kAppleManufacturer;
+        compDesc.componentFlags = canMovieExportFromProcedures | movieExportMustGetSourceMediaType;
+        compDesc.componentFlagsMask = compDesc.componentFlags;
+        
+        if ((err = OpenAComponent(FindNextComponent(NULL, &compDesc), &componentInstance)) != noErr)
+            BailErr(err);
+        
+        MovieExportNewGetDataAndPropertiesProcs(componentInstance,
+                                                SoundMediaType,
+                                                &scFillBufferData.timescale,
+                                                theSrcMovie,
+                                                NULL,
+                                                0,
+                                                GetMovieDuration(theSrcMovie),
+                                                &scFillBufferData.getPropertyProc,
+                                                &scFillBufferData.getDataProc, 
+                                                &scFillBufferData.refCon);
+        
+        if (scFillBufferData.getDataProc == NULL || scFillBufferData.getPropertyProc == NULL)
+            BailErr(paramErr);
+        
+        scFillBufferData.trackID = 0;
+        getDataParams.recordSize = sizeof(MovieExportGetDataParams);
+        getDataParams.trackID = scFillBufferData.trackID;
+        getDataParams.requestedTime = 0;
+        getDataParams.sourceTimeScale = scFillBufferData.timescale;
+        getDataParams.actualTime = 0;
+        getDataParams.dataPtr = NULL;
+        getDataParams.dataSize = 0;
+        getDataParams.desc = NULL;
+        getDataParams.descType = 0;
+        getDataParams.descSeed = 0;
+        getDataParams.requestedSampleCount = 0;
+        getDataParams.actualSampleCount = 0;
+        getDataParams.durationPerSample = 1;
+        getDataParams.sampleFlags = 0; 
+        
+        if ((err = InvokeMovieExportGetDataUPP(scFillBufferData.refCon, &getDataParams, scFillBufferData.getDataProc)) != noErr)
+            BailErr(err);
+        
+        theSrcInputFormatInfo = **((SoundDescriptionHandle)getDataParams.desc);
+        
+        // setup input format for sound converter
+        theInputFormat.flags = 0;
+        theInputFormat.format = theSrcInputFormatInfo.dataFormat;
+        theInputFormat.numChannels = theSrcInputFormatInfo.numChannels;
+        theInputFormat.sampleSize = theSrcInputFormatInfo.sampleSize;
+        theInputFormat.sampleRate = theSrcInputFormatInfo. sampleRate;
+        theInputFormat.sampleCount = 0;
+        theInputFormat.buffer = NULL;
+        theInputFormat.reserved = 0;
+        
+        theOutputFormat.flags = kNoRealtimeProcessing;
+        theOutputFormat.format = k16BitBigEndianFormat;
+        theOutputFormat.numChannels = 2; // theInputFormat.numChannels;
+        theOutputFormat.sampleSize = 16;
+        theOutputFormat.sampleRate = 44100 << 16; //theInputFormat.sampleRate;
+        theOutputFormat.sampleCount = 0;
+        theOutputFormat.buffer = NULL;
+        theOutputFormat.reserved = 0;
+        
 	// *********** SOUND CONVERTER: Open converter and prepare for buffer conversion...captain!
-
-		err = SoundConverterOpen(&theInputFormat, &theOutputFormat, &mySoundConverter);
-		BailErr(err);
-		
-		// tell the sound converter we're cool with VBR formats
-//		SoundConverterSetInfo(mySoundConverter, siClientAcceptsVBR, Ptr(true));															
-
-		// set up the sound converters compression environment
-		// pass down siCompressionSampleRate, siCompressionChannels then siCompressionParams
-		SoundConverterSetInfo(mySoundConverter, siCompressionSampleRate, &theOutputFormat.sampleRate); // ignore errors
-		SoundConverterSetInfo(mySoundConverter, siCompressionChannels, &theOutputFormat.numChannels);
-
-		// set up the compression environment by passing in the 'magic' compression params aquired from
-		// standard sound compression eariler
-		if (theCompressionParams) {
-			HLock(theCompressionParams);
-			err = SoundConverterSetInfo(mySoundConverter, siCompressionParams, *theCompressionParams);
-			BailErr(err);
-			HUnlock(theCompressionParams);
-		}
-
-		// set up the decompresson environment by passing in the 'magic' decompression params
-		if (theDecompressionParams) {
-			// don't check for an error, if the decompressor didn't need the
-			// decompression atom for whatever reason we should still be ok
-			SoundConverterSetInfo(mySoundConverter, siDecompressionParams, theDecompressionParams);
-		}
-		
-		// we need to know if the output sample rate was changed so we can write it in the image description
-		// few codecs (but some) will implement this - MPEG4 for example may change the output sample rate if
-		// the user selects a low bit rate -  ignore errors
-	 	theOutputSampleRate = theOutputFormat.sampleRate;
-		SoundConverterGetInfo(mySoundConverter, siCompressionOutputSampleRate, &theOutputSampleRate);
-		
-		err = SoundConverterBeginConversion(mySoundConverter);
-		BailErr(err);
-		
-		// we need to get info about data/frame sizes 
-		// good practice to fill in the size of this structure
-		CompressionInfo compressionFactor = { sizeof(compressionFactor), 0 };
-		
-		hSoundDescription = (SoundDescriptionV1Handle)NewHandleClear(sizeof(SoundDescriptionV1));	
-		BailErr(MemError());
-		
-		err = SoundConverterGetInfo(mySoundConverter, siCompressionFactor, &compressionFactor);				
-		BailErr(err);
-
-		HLock((Handle)hSoundDescription);
-		
-		(*hSoundDescription)->desc.descSize		 = sizeof(SoundDescriptionV1);
-		(*hSoundDescription)->desc.dataFormat	 = (long)theOutputFormat.format;	   // compression format
-		(*hSoundDescription)->desc.resvd1		 = 0;								   // must be 0
-		(*hSoundDescription)->desc.resvd2		 = 0;							       // must be 0
-		(*hSoundDescription)->desc.dataRefIndex	 = 0;								   // 0 - we'll let AddMediaXXX determine the index
-		(*hSoundDescription)->desc.version		 = 1;								   // set to 1
-		(*hSoundDescription)->desc.revlevel		 = 0;								   // set to 0
-		(*hSoundDescription)->desc.vendor		 = 0;
-		(*hSoundDescription)->desc.numChannels	 = theOutputFormat.numChannels;		   // number of channels
-		(*hSoundDescription)->desc.sampleSize	 = theOutputFormat.sampleSize;		   // bits per sample - everything but 8 bit can be set to 16
-		(*hSoundDescription)->desc.compressionID = compressionFactor.compressionID;    // the compression ID (eg. variableCompression)
-		(*hSoundDescription)->desc.packetSize	 = 0;								   // set to 0
-		(*hSoundDescription)->desc.sampleRate	 = theOutputSampleRate;		   		   // the sample rate
-		// version 1 stuff
-		(*hSoundDescription)->samplesPerPacket 	 = compressionFactor.samplesPerPacket; // the samples per packet holds the PCM sample count per audio frame (packet)
-		(*hSoundDescription)->bytesPerPacket 	 = compressionFactor.bytesPerPacket;   // the bytes per packet
-		
-		// bytesPerFrame isn't necessarily calculated for us and returned as part of the CompressionFactor - not all codecs that
-		// implement siCompressionFactor fill out bytesPerFrame - so we do it here - note that VBR doesn't deserve this treatment
-		// but it's not harmful, the Sound Manager would do calculations itself as part of GetCompressionInfo()
-		// It should be noted that GetCompressionInfo() doesn't work for codecs that need configuration with 'magic' settings.
-		// This requires explicit opening of the codec and the siCompressionFactor selector for SoundComponentGetInfo()
-		(*hSoundDescription)->bytesPerFrame 	 = compressionFactor.bytesPerPacket * theOutputFormat.numChannels;
-		(*hSoundDescription)->bytesPerSample 	 = compressionFactor.bytesPerSample;							
-       
+        
+        err = SoundConverterOpen(&theInputFormat, &theOutputFormat, &mySoundConverter);
+        BailErr(err);
+        
+        // tell the sound converter we're cool with VBR formats
+        SoundConverterSetInfo(mySoundConverter, siClientAcceptsVBR, Ptr(true));															
+        
+        // set up the sound converters compression environment
+        // pass down siCompressionSampleRate, siCompressionChannels then siCompressionParams
+        SoundConverterSetInfo(mySoundConverter, siCompressionSampleRate, &theOutputFormat.sampleRate); // ignore errors
+        SoundConverterSetInfo(mySoundConverter, siCompressionChannels, &theOutputFormat.numChannels);
+        
+        // set up the compression environment by passing in the 'magic' compression params aquired from
+        // standard sound compression eariler
+        if (theCompressionParams) {
+            HLock(theCompressionParams);
+            err = SoundConverterSetInfo(mySoundConverter, siCompressionParams, *theCompressionParams);
+            BailErr(err);
+            HUnlock(theCompressionParams);
+        }
+        
+        // set up the decompresson environment by passing in the 'magic' decompression params
+        if (theDecompressionParams) {
+            // don't check for an error, if the decompressor didn't need the
+            // decompression atom for whatever reason we should still be ok
+            SoundConverterSetInfo(mySoundConverter, siDecompressionParams, theDecompressionParams);
+        }
+        
+        // we need to know if the output sample rate was changed so we can write it in the image description
+        // few codecs (but some) will implement this - MPEG4 for example may change the output sample rate if
+        // the user selects a low bit rate -  ignore errors
+        theOutputSampleRate = theOutputFormat.sampleRate;
+        SoundConverterGetInfo(mySoundConverter, siCompressionOutputSampleRate, &theOutputSampleRate);
+        
+        err = SoundConverterBeginConversion(mySoundConverter);
+        BailErr(err);
+        
+        // we need to get info about data/frame sizes 
+        // good practice to fill in the size of this structure
+        compressionFactor.recordSize = sizeof(compressionFactor);
+        
+        hSoundDescription = (SoundDescriptionV1Handle)NewHandleClear(sizeof(SoundDescriptionV1));	
+        BailErr(MemError());
+        
+        err = SoundConverterGetInfo(mySoundConverter, siCompressionFactor, &compressionFactor);				
+        BailErr(err);
+        
+        HLock((Handle)hSoundDescription);
+        
+        (*hSoundDescription)->desc.descSize		 = sizeof(SoundDescriptionV1);
+        (*hSoundDescription)->desc.dataFormat	 = (long)theOutputFormat.format;	   // compression format
+        (*hSoundDescription)->desc.resvd1		 = 0;								   // must be 0
+        (*hSoundDescription)->desc.resvd2		 = 0;							       // must be 0
+        (*hSoundDescription)->desc.dataRefIndex	 = 0;								   // 0 - we'll let AddMediaXXX determine the index
+        (*hSoundDescription)->desc.version		 = 1;								   // set to 1
+        (*hSoundDescription)->desc.revlevel		 = 0;								   // set to 0
+        (*hSoundDescription)->desc.vendor		 = 0;
+        (*hSoundDescription)->desc.numChannels	 = theOutputFormat.numChannels;		   // number of channels
+        (*hSoundDescription)->desc.sampleSize	 = theOutputFormat.sampleSize;		   // bits per sample - everything but 8 bit can be set to 16
+        (*hSoundDescription)->desc.compressionID = compressionFactor.compressionID;    // the compression ID (eg. variableCompression)
+        (*hSoundDescription)->desc.packetSize	 = 0;								   // set to 0
+        (*hSoundDescription)->desc.sampleRate	 = theOutputSampleRate;		   		   // the sample rate
+                                                                                                   // version 1 stuff
+        (*hSoundDescription)->samplesPerPacket 	 = compressionFactor.samplesPerPacket; // the samples per packet holds the PCM sample count per audio frame (packet)
+        (*hSoundDescription)->bytesPerPacket 	 = compressionFactor.bytesPerPacket;   // the bytes per packet
+        
+        // bytesPerFrame isn't necessarily calculated for us and returned as part of the CompressionFactor - not all codecs that
+        // implement siCompressionFactor fill out bytesPerFrame - so we do it here - note that VBR doesn't deserve this treatment
+        // but it's not harmful, the Sound Manager would do calculations itself as part of GetCompressionInfo()
+        // It should be noted that GetCompressionInfo() doesn't work for codecs that need configuration with 'magic' settings.
+        // This requires explicit opening of the codec and the siCompressionFactor selector for SoundComponentGetInfo()
+        (*hSoundDescription)->bytesPerFrame 	 = compressionFactor.bytesPerPacket * theOutputFormat.numChannels;
+        (*hSoundDescription)->bytesPerSample 	 = compressionFactor.bytesPerSample;							
+        
         // the theCompressionParams are not necessarily present
-		if (theCompressionParams) {
-			// a Sound Description can't be locked when calling AddSoundDescriptionExtension so make sure it's unlocked
-			HUnlock((Handle)hSoundDescription);
-			err = AddSoundDescriptionExtension((SoundDescriptionHandle)hSoundDescription, theCompressionParams, siDecompressionParams);	
-			BailErr(err);
-			HLock((Handle)hSoundDescription);
-		}
+        if (theCompressionParams) {
+            // a Sound Description can't be locked when calling AddSoundDescriptionExtension so make sure it's unlocked
+            HUnlock((Handle)hSoundDescription);
+            err = AddSoundDescriptionExtension((SoundDescriptionHandle)hSoundDescription, theCompressionParams, siDecompressionParams);	
+            BailErr(err);
+            HLock((Handle)hSoundDescription);
+        }
         
         // VBR implies a different media layout, this will affect how AddMediaSample() is called below
-        Boolean outputFormatIsVBR = ((*hSoundDescription)->desc.compressionID == variableCompression);
+        outputFormatIsVBR = ((*hSoundDescription)->desc.compressionID == variableCompression);
         
 	// *********** SOUND CONVERTER: Create buffers and Convert Data
-
-		// figure out sizes for the input and output buffers
-		// the input buffer has to be large enough so GetMediaSample isn't going to fail
-		// start with some rough numbers which should work well
-		UInt32 inputBytes = ((1000 + (theInputFormat.sampleRate >> 16)) * theInputFormat.numChannels) * 4,
-			   outputBytes = 0,
-			   maxPacketSize = 0;
-		
-		// ask about maximum packet size (or worst case packet size) so we don't allocate a destination (output)
-		// buffer that's too small - an output buffer smaller than MaxPacketSize would be really bad - init maxPacketSize
-		// to 0 so if the request isn't understood we can create a number (some multiple of maxPacketSize) and go from there
-		// this is likely only implemented by VBR codecs so don't get anxious about it not being implemented
-		SoundConverterGetInfo(mySoundConverter, siCompressionMaxPacketSize, &maxPacketSize);
-		
-		// start with this - you don't really need to use GetBufferSizes just as long as the output buffer is larger than
-		// the MaxPacketSize if implemented - we use kMaxBufferSize which is 64k as a minimum
-		SoundConverterGetBufferSizes(mySoundConverter, kMaxBufferSize, NULL, NULL, &outputBytes);
-		
-		if (0 == maxPacketSize)
-			maxPacketSize = kMaxBufferSize;   // kMaxBufferSize is 64k
-											 								  
-		if (inputBytes < kMaxBufferSize)	  // kMaxBufferSize is 64k
-			inputBytes = kMaxBufferSize;	  // note this is still too small for DV (NTSC=120000, PAL=144000)
-			
-		if (outputBytes < maxPacketSize)	  
-			outputBytes = maxPacketSize;
-
-		// allocate conversion buffer
-		pDecomBuffer = NewPtr(outputBytes);
-		BailErr(MemError());
-		
-		// fill in struct that gets passed to SoundConverterFillBufferDataProc via the refcon
-		// this includes the ExtendedSoundComponentData information		
-		scFillBufferData.sourceMedia = theSrcMedia;
-		scFillBufferData.getMediaAtThisTime = 0;		
-		scFillBufferData.sourceDuration = GetMediaDuration(theSrcMedia);
-		scFillBufferData.isThereMoreSource = true;
-		scFillBufferData.maxBufferSize = inputBytes;
-		
-		// if the source is VBR it means we're going to set the kExtendedSoundCommonFrameSizeValid
-		// flag and use the commonFrameSize field in the FillBuffer callback
-		scFillBufferData.isSourceVBR = (theSrcInputFormatInfo.compressionID == variableCompression);
-		
-		scFillBufferData.hSource = NewHandle((long)scFillBufferData.maxBufferSize);	// allocate source media buffer
-		BailErr(MemError());
-		HLockHi((Handle)scFillBufferData.hSource);
-		
-		scFillBufferData.compData.desc = theInputFormat;
-		scFillBufferData.compData.desc.buffer = (BytePtr)*scFillBufferData.hSource;
-		scFillBufferData.compData.desc.flags = kExtendedSoundData;
-		scFillBufferData.compData.recordSize = sizeof(ExtendedSoundComponentData);
-		scFillBufferData.compData.extendedFlags = kExtendedSoundBufferSizeValid;
-		if (scFillBufferData.isSourceVBR) scFillBufferData.compData.extendedFlags |= kExtendedSoundCommonFrameSizeValid;
-		scFillBufferData.compData.bufferSize = 0;	// filled in during FillBuffer callback
-
-		if (err == noErr) {	
-			
-			UInt32 outputFrames,
-				   actualOutputBytes,
-				   outputFlags,
-				   durationPerMediaSample,
-				   numberOfMediaSamples;
-				   			
-			SoundConverterFillBufferDataUPP theFillBufferDataUPP = NewSoundConverterFillBufferDataUPP(SoundConverterFillBufferDataProc);	
-
-			while (!isSoundDone) {
-//				fprintf(stderr, ".");
-				err = SoundConverterFillBuffer(mySoundConverter,		// a sound converter
-											   theFillBufferDataUPP,	// the callback UPP
-											   &scFillBufferData,		// refCon passed to FillDataProc
-											   pDecomBuffer,			// the destination data  buffer
-											   outputBytes,				// size of the destination buffer
-											   &actualOutputBytes,		// number of output bytes
-											   &outputFrames,			// number of output frames
-											   &outputFlags);			// FillBuffer retured advisor flags
-				if (err) break;
-				if((outputFlags & kSoundConverterHasLeftOverData) == false) {
-					isSoundDone = true;
-				}
-				
-				// see if output buffer is filled so we can write some data	
-				if (actualOutputBytes > 0) {					
-					// so, what are we going to pass to AddMediaSample?
-					// 
-					// for variableCompression, a media sample == an audio packet (compressed), this is also true for uncompressed audio
-					// for fixedCompression, a media sample is a portion of an audio packet - it is 1 / compInfo.samplesPerPacket worth
-					// of data, there's no way to access just a portion of the samples
-					// therefore, we need to know if our compression format is VBR or Fixed and make the correct calculations for
-					// either VBR or not - Fixed and uncompressed are treated the same
-					if (outputFormatIsVBR) {
-						numberOfMediaSamples = outputFrames;
-						durationPerMediaSample = compressionFactor.samplesPerPacket;
-					} else {		
-						numberOfMediaSamples = outputFrames * compressionFactor.samplesPerPacket;
-						durationPerMediaSample = 1;
-					}
-
-					if (!fwrite(pDecomBuffer, actualOutputBytes, 1, outFile)) goto bail;
-				}
-
-			} // while
-			
-			SoundConverterEndConversion(mySoundConverter, pDecomBuffer, &outputFrames, &actualOutputBytes);
-
-			// if there's any left over data write it out
-			if (noErr == err && actualOutputBytes > 0) {
-				// see above comments regarding these calculations
-				if (outputFormatIsVBR) {
-					numberOfMediaSamples = outputFrames;
-					durationPerMediaSample = compressionFactor.samplesPerPacket;
-				} else {		
-					numberOfMediaSamples = outputFrames * compressionFactor.samplesPerPacket;
-					durationPerMediaSample = 1;
-				}
-
-				if (!fwrite(pDecomBuffer, actualOutputBytes, 1, outFile)) goto bail;
-
-				BailErr(err);
-			}
-			
-			if (theFillBufferDataUPP) {
-				DisposeSoundConverterFillBufferDataUPP(theFillBufferDataUPP);
-			}
-		}
-						
-	}
-						
+        
+        // figure out sizes for the input and output buffers
+        // the input buffer has to be large enough so GetMediaSample isn't going to fail
+        // start with some rough numbers which should work well
+        inputBytes = ((1000 + (theInputFormat.sampleRate >> 16)) * theInputFormat.numChannels) * 4;
+        outputBytes = 0;
+        maxPacketSize = 0;
+        
+        // ask about maximum packet size (or worst case packet size) so we don't allocate a destination (output)
+        // buffer that's too small - an output buffer smaller than MaxPacketSize would be really bad - init maxPacketSize
+        // to 0 so if the request isn't understood we can create a number (some multiple of maxPacketSize) and go from there
+        // this is likely only implemented by VBR codecs so don't get anxious about it not being implemented
+        SoundConverterGetInfo(mySoundConverter, siCompressionMaxPacketSize, &maxPacketSize);
+        
+        // start with this - you don't really need to use GetBufferSizes just as long as the output buffer is larger than
+        // the MaxPacketSize if implemented - we use kMaxBufferSize which is 64k as a minimum
+        SoundConverterGetBufferSizes(mySoundConverter, kMaxBufferSize, NULL, NULL, &outputBytes);
+        
+        if (0 == maxPacketSize)
+            maxPacketSize = kMaxBufferSize;   // kMaxBufferSize is 64k
+        
+        if (inputBytes < kMaxBufferSize)	  // kMaxBufferSize is 64k
+            inputBytes = kMaxBufferSize;	  // note this is still too small for DV (NTSC=120000, PAL=144000)
+        
+        if (outputBytes < maxPacketSize)	  
+            outputBytes = maxPacketSize;
+        
+        // allocate conversion buffer
+        pDecomBuffer = NewPtr(outputBytes);
+        BailErr(MemError());
+        
+        // fill in struct that gets passed to SoundConverterFillBufferDataProc via the refcon
+        // this includes the ExtendedSoundComponentData information		
+        scFillBufferData.currentTime = 0;		
+        scFillBufferData.duration = convertTime(GetMovieDuration(theSrcMovie), GetMovieTimeScale(theSrcMovie), scFillBufferData.timescale);
+        scFillBufferData.isThereMoreSource = true;
+        
+        // if the source is VBR it means we're going to set the kExtendedSoundCommonFrameSizeValid
+        // flag and use the commonFrameSize field in the FillBuffer callback
+        scFillBufferData.isSourceVBR = (theSrcInputFormatInfo.compressionID == variableCompression);
+        
+        scFillBufferData.compData.desc = theInputFormat;
+        scFillBufferData.compData.desc.flags = kExtendedSoundData;
+        scFillBufferData.compData.recordSize = sizeof(ExtendedSoundComponentData);
+        scFillBufferData.compData.extendedFlags = kExtendedSoundBufferSizeValid;
+        if (scFillBufferData.isSourceVBR) scFillBufferData.compData.extendedFlags |= kExtendedSoundCommonFrameSizeValid;
+        scFillBufferData.compData.bufferSize = 0;	// filled in during FillBuffer callback
+        
+        if (err == noErr) {	
+            
+            UInt32 outputFrames,
+            actualOutputBytes,
+            outputFlags,
+            durationPerMediaSample,
+            numberOfMediaSamples;
+            
+            SoundConverterFillBufferDataUPP theFillBufferDataUPP = NewSoundConverterFillBufferDataUPP(SoundConverterFillBufferDataProc);	
+            
+            while (!isSoundDone) {
+                
+                err = SoundConverterFillBuffer(mySoundConverter,		// a sound converter
+                                               theFillBufferDataUPP,	// the callback UPP
+                                               &scFillBufferData,		// refCon passed to FillDataProc
+                                               pDecomBuffer,			// the destination data  buffer
+                                               outputBytes,				// size of the destination buffer
+                                               &actualOutputBytes,		// number of output bytes
+                                               &outputFrames,			// number of output frames
+                                               &outputFlags);			// FillBuffer retured advisor flags
+                if (err) break;
+                if((outputFlags & kSoundConverterHasLeftOverData) == false) {
+                    isSoundDone = true;
+                }
+                
+                // see if output buffer is filled so we can write some data	
+                if (actualOutputBytes > 0) {					
+                    // so, what are we going to pass to AddMediaSample?
+                    // 
+                    // for variableCompression, a media sample == an audio packet (compressed), this is also true for uncompressed audio
+                    // for fixedCompression, a media sample is a portion of an audio packet - it is 1 / compInfo.samplesPerPacket worth
+                    // of data, there's no way to access just a portion of the samples
+                    // therefore, we need to know if our compression format is VBR or Fixed and make the correct calculations for
+                    // either VBR or not - Fixed and uncompressed are treated the same
+                    if (outputFormatIsVBR) {
+                        numberOfMediaSamples = outputFrames;
+                        durationPerMediaSample = compressionFactor.samplesPerPacket;
+                    } else {		
+                        numberOfMediaSamples = outputFrames * compressionFactor.samplesPerPacket;
+                        durationPerMediaSample = 1;
+                    }
+                    
+                    if (!fwrite(pDecomBuffer, actualOutputBytes, 1, outFile)) goto bail;
+                    
+                    if (err) break;
+                }
+                
+            } // while
+            
+            SoundConverterEndConversion(mySoundConverter, pDecomBuffer, &outputFrames, &actualOutputBytes);
+            
+            // if there's any left over data write it out
+            if (noErr == err && actualOutputBytes > 0) {
+                // see above comments regarding these calculations
+                if (outputFormatIsVBR) {
+                    numberOfMediaSamples = outputFrames;
+                    durationPerMediaSample = compressionFactor.samplesPerPacket;
+                } else {		
+                    numberOfMediaSamples = outputFrames * compressionFactor.samplesPerPacket;
+                    durationPerMediaSample = 1;
+                }
+                
+                if (!fwrite(pDecomBuffer, actualOutputBytes, 1, outFile)) goto bail;
+                
+                BailErr(err);
+            }
+            
+            if (theFillBufferDataUPP)
+                DisposeSoundConverterFillBufferDataUPP(theFillBufferDataUPP);
+        }
+        
+    }
+        
 bail:
-	if (mySoundConverter)
-		SoundConverterClose(mySoundConverter);
-
-	if (scFillBufferData.hSource)
-		DisposeHandle(scFillBufferData.hSource);
-		
-	if (pDecomBuffer)
-		DisposePtr(pDecomBuffer);
-		
-	if (theCompressionParams)
-		DisposeHandle(theCompressionParams);
-		
-	if (theDecompressionParams)
-		DisposePtr((Ptr)theDecompressionParams);
-		
-	if (hSoundDescription)
-		DisposeHandle((Handle)hSoundDescription);
-		
-	if (theSrcMovie)
-		DisposeMovie(theSrcMovie);
-
-	return err;
+        if (mySoundConverter)
+            SoundConverterClose(mySoundConverter);
+        
+        if (pDecomBuffer)
+            DisposePtr(pDecomBuffer);
+        
+        if (theCompressionParams)
+            DisposeHandle(theCompressionParams);
+        
+        if (theDecompressionParams)
+            DisposePtr((Ptr)theDecompressionParams);
+        
+        if (hSoundDescription)
+            DisposeHandle((Handle)hSoundDescription);
+        
+        if (scFillBufferData.getPropertyProc || scFillBufferData.getDataProc)
+            MovieExportDisposeGetDataAndPropertiesProcs(componentInstance, scFillBufferData.getPropertyProc, scFillBufferData.getDataProc, scFillBufferData.refCon);
+        
+        if (componentInstance)
+            CloseComponent(componentInstance);
+        
+        if (theSrcMovie)
+            DisposeMovie(theSrcMovie);
+        
+        
+        if (hSys7SoundData)
+            DisposeHandle(hSys7SoundData);
+        
+        return err;
+    
 }

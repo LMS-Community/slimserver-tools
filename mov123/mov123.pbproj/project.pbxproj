@@ -42,7 +42,7 @@
 //033
 //034
 		034768E8FF38A79811DB9C8B = {
-			expectedFileType = "compiled.mach-o.executable";
+			explicitFileType = "compiled.mach-o.executable";
 			fallbackIsa = PBXFileReference;
 			isa = PBXExecutableFileReference;
 			path = mov123;
@@ -60,9 +60,9 @@
 //053
 //054
 		054412B505405A920086FD13 = {
-			expectedFileType = sourcecode.cpp.cpp;
 			fileEncoding = 30;
 			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
 			path = mov123.cpp;
 			refType = 4;
 			sourceTree = "<group>";
@@ -216,18 +216,18 @@
 			sourceTree = "<group>";
 		};
 		67F52649029B02AF05CB1624 = {
-			expectedFileType = wrapper.framework;
 			fallbackIsa = PBXFileReference;
 			isa = PBXFrameworkReference;
+			lastKnownFileType = wrapper.framework;
 			name = Carbon.framework;
 			path = /System/Library/Frameworks/Carbon.framework;
 			refType = 0;
 			sourceTree = "<absolute>";
 		};
 		67F5264A029B02AF05CB1624 = {
-			expectedFileType = wrapper.framework;
 			fallbackIsa = PBXFileReference;
 			isa = PBXFrameworkReference;
+			lastKnownFileType = wrapper.framework;
 			name = QuickTime.framework;
 			path = /System/Library/Frameworks/QuickTime.framework;
 			refType = 0;
