@@ -62,7 +62,7 @@
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalOptions="/I &quot;E:\dean\QTDevWin\CIncludes&quot;"
+				AdditionalOptions="/I QTDevWin\CIncludes&quot;"
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				OmitFramePointers="TRUE"

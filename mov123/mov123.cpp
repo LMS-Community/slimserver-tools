@@ -351,7 +351,7 @@ OSErr ConvertMovieSndTrack(const char* inFileToConvert)
 		theInputFormat.reserved = 0;
 
 		theOutputFormat.flags = kNoRealtimeProcessing;
-		theOutputFormat.format = kSoundNotCompressed;
+		theOutputFormat.format = k16BitBigEndianFormat;
 		theOutputFormat.numChannels = 2; // theInputFormat.numChannels;
 		theOutputFormat.sampleSize = 16;
 		theOutputFormat.sampleRate = 44100 << 16; //theInputFormat.sampleRate;
