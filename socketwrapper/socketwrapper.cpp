@@ -150,7 +150,6 @@ DWORD main(int argc, char **argv)
 		numProcesses++;
 		token = strtok(NULL, "|");
 	}
-	fprintf(stderr, "Command line contains %d processes\n", numProcesses);
 
 	// Allocate process handle array
 	PHANDLE pProcessHandles = new HANDLE[numProcesses];
@@ -165,18 +164,14 @@ DWORD main(int argc, char **argv)
 	HANDLE hNextInput = (inputSocketDup == INVALID_HANDLE_VALUE) ? 
 		GetStdHandle(STD_INPUT_HANDLE) : inputSocketDup;
 	for (int i = 0; i < numProcesses; i++) {
-		fprintf(stderr, "Handling process %d with command line %s\n", i, token);
 		HANDLE hInput = hNextInput, hOutput;
 		// If this is the last process, use the output socket
 		if (i == numProcesses-1) {
-			fprintf(stderr, "Using ouput socket\n", token);
 			hOutput = (outputSocketDup == INVALID_HANDLE_VALUE) ? 
 				GetStdHandle(STD_OUTPUT_HANDLE) : outputSocketDup;
 		}
 		// Otherwise, create a pipe to connect to the next process
 		else {
-			fprintf(stderr, "Creating a pipe\n", token);
-
 			SECURITY_ATTRIBUTES saAttr; 
 
 			saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
