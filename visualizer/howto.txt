@@ -1,0 +1,62 @@
+	Slim Devices Visualizer Plugin Architecture
+
+Overview:
+
+Squeezebox supports a versatile and powerful visualizer architecture which
+allows many kinds of effects to be synchronized to the audio playback. 
+
+			[graphic]
+
+Audio destined for the squeezebox is read in through a visualizer process
+and piped to SlimServer. As the data is fed through the visualizer, it is
+made available to plugins which generate their effects based on either PCM
+or spectral data extracted from the stream. 
+
+The visualizer engine does the work of communicating with squeezebox and 
+maintaining synchronization. As the stream passes through the process, it 
+is spliced out into a queue, where each of the audio chunks is held 
+until the client reaches the corresponding point in the stream. At that 
+time, the chunk is released from the queue into the visualizer plugin, 
+where it can be processed in order to generate the effect.
+
+Control
+
+All plugins must provide a minimal set of functions for startup, shutdown,
+and control purposes. The functions that a plugin can provide are as
+follows:
+
+init	
+
+	Optional - called when the visualizer engine first starts up.  
+Initialize any permanent data tables and such here.
+
+instance_alloc	
+
+	Visualizers must be designed to work for multiple clients. Create
+your per-client state here, and return a client-specific opaque pointer 
+which will be given to you with each chunk of audio data.
+
+instance_destroy
+
+	Shut down and free any client specific data. Before it calls this,
+the visualizer engine will take care of releasing any pending frames.
+
+shutdown
+	Optional - this is only for if you need to do stuff when the
+visualizer process goes away due to slimserver shutdown.
+
+feed_pcm
+	Optional - Accept an array of samples. Usually you will have
+either this OR feed_spec... you could have neither or both of them, but
+usually you would want just one.
+
+feed_spec
+	Optional - Accept an array of spectral magnitudes
+
+set_graphics_area
+	Recommended for plugins that generate slimproto graphics. Allows
+the server to restrict the display area used by your plugin in order to
+allow for other things to be displayed during navigation. You can choose
+to use less than the display area given here, but using more is probably
+not nice.
+	
