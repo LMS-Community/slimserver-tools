@@ -9,11 +9,11 @@ This directory contains several scripts to work along with the slimserver softwa
 	If no argument, it will start with the current directory.  If you run this from the root 
 	directory of the skin, it will convert that skin without any arguments needed.  This script
 	replaces slimp3.css with slimserver.css, all references within the html file to 
-	slimserver.css, and converts any perl module calls to the new slim server modules.  
+	slimserver.css, and converts any perl module calls to the new SlimServer modules.  
 	Old html files are copied and saved to a directory named "old".
 
 -slimp3.pl
-	Command line interface access to the slim server.
+	Command line interface access to the SlimServer.
 	Usage: slimp3.pl --httpaddr <host|ip> --httpport <port> --command <command> 
           [--p1 <arg>] [--p2 <arg>] [--p3 <arg>] [--p4 <arg>] [--player <playerid>]
 

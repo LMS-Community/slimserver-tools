@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 
-# Update the strings.txt file from the Slim Server project.
+# Update the strings.txt file from the SlimServer project.
 #
 # Reads the strings.txt file and checks all items for the 
 # presence of an entry defined in $language.

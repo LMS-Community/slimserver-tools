@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # 
 # Translates slimp3 skins for SLIMP3 Server to 
-# new format for Slim Server 5.0 and beyond.
+# new format for SlimServer 5.0 and beyond.
 #
 # Renames slimp3.css to slimserver.css and edits all html files
 # for perl module references and css references.

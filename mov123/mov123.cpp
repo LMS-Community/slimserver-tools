@@ -1,5 +1,5 @@
 //
-// Slim Server Copyright (C) 2003 Sean Adams, Slim Devices Inc.
+// SlimServer Copyright (C) 2003 Sean Adams, Slim Devices Inc.
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License,
 // version 2.
@@ -33,7 +33,9 @@
 
 #include <stdio.h>
 #include <fcntl.h>
+
 #include <io.h>
+
 
 #ifdef WIN32
 #include "stdafx.h"
