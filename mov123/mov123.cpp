@@ -41,8 +41,10 @@
 
 #ifdef WIN32
 #include "stdafx.h"
+#include "io.h"
 #include "Movies.h"
 #include "SoundComponents.h"
+#include "QuickTimeComponents.h"
 #include "QTML.h"
 #else
 #include <QuickTime/QuickTime.h>
@@ -101,6 +103,7 @@ int main(int argc, char *argv[])
 
 
 #ifndef AVAILABLE_MAC_OS_X_VERSION_10_2_AND_LATER
+#ifndef WIN32
 	// these didn't make it into the QT6 framework for 10.1.x so include
 	// them here if we're not on 10.2 or later - if you have a newer framework
 	// or are building a carbon CFM version you shouldn't need these
@@ -110,6 +113,7 @@ int main(int argc, char *argv[])
 	  scSoundSampleRateChangeOK     = 'rcok', /* pointer to Boolean*/
 	  scAvailableCompressionListType = 'avai' /* pointer to OSType Handle*/
 	};
+#endif
 #endif
 
 
@@ -178,8 +182,13 @@ static pascal Boolean SoundConverterFillBufferDataProc(SoundComponentDataPtr *ou
             pFillData->compData.bufferSize = 0;		
             pFillData->compData.commonFrameSize = 0;
             
-            if ((err != noErr) && (getDataParams.dataSize > 0))
+			if ((err != noErr) && (getDataParams.dataSize > 0)) {
+#ifdef WIN32
+				fprintf(stderr, "InvokeMovieExportGetDataUPP - Failed in FillBufferDataProc");
+#else
                 DebugStr("\pInvokeMovieExportGetDataUPP - Failed in FillBufferDataProc");
+#endif
+			}
         }
         
         pFillData->currentTime += convertTime(getDataParams.actualSampleCount, (pFillData->compData.desc.sampleRate >> 16), pFillData->timescale) * getDataParams.durationPerSample;
@@ -272,10 +281,10 @@ OSErr ConvertMovieSndTrack(const char* inFileToConvert)
         
         Handle urlDataRef; 
         
-        urlDataRef = NewHandle(strlen(inFileToConvert) + 1); 
+        urlDataRef = NewHandle((Size)strlen(inFileToConvert) + 1); 
         if ( ( err = MemError()) != noErr) goto bail; 
         
-        BlockMoveData(inFileToConvert, *urlDataRef, strlen(inFileToConvert) + 1); 
+        BlockMoveData(inFileToConvert, *urlDataRef, (Size)strlen(inFileToConvert) + 1); 
         
         err = NewMovieFromDataRef(&theSrcMovie, newMovieActive, nil, urlDataRef, URLDataHandlerSubType); 
         if (err) {printf("NewMovieFrom Data Ref failed on source file %s with %d\n", inFileToConvert, err); goto bail; }
@@ -557,10 +566,10 @@ OSErr ConvertMovieSndTrack(const char* inFileToConvert)
                 BailErr(err);
             }
             
-            if (theFillBufferDataUPP)
+			if (theFillBufferDataUPP) {
                 DisposeSoundConverterFillBufferDataUPP(theFillBufferDataUPP);
+			}
         }
-        
     }
         
 bail:
