@@ -27,6 +27,17 @@
 static char* gOptionStr = "i:o:c:";
 
 void
+KillAllProcesses(PHANDLE pProcessHandles, int numProcesses) {
+	for (int i = 0; i < numProcesses; i++) {
+		if (pProcessHandles[i] == INVALID_HANDLE_VALUE) {
+			break;
+		}
+		TerminateProcess(pProcessHandles[i], 0);
+		CloseHandle(pProcessHandles[i]);
+	}
+}
+
+void
 printUsage() {
 	fprintf(stderr, 
 	  "socketwrapper -i port -o port -c command\n"
@@ -43,6 +54,7 @@ DWORD main(int argc, char **argv)
 	USHORT inputPort = 0, outputPort = 0;
 	LPSTR command = NULL;
 
+	// Parse the command line arguments
 	char c;
 	while ((c = getopt(argc, argv, gOptionStr)) != EOF) {
 		switch(c) {
@@ -66,6 +78,7 @@ DWORD main(int argc, char **argv)
 		return -1;
 	}
 
+	// Initialize Winsock
 	WORD wVersionRequested = MAKEWORD( 1, 1 );
 	WSADATA wsaData;
 	int err = WSAStartup( wVersionRequested, &wsaData );
@@ -74,6 +87,7 @@ DWORD main(int argc, char **argv)
 		return -1;
 	}
 
+	// Connect to the specified ports
 	SOCKET inputSocket = INVALID_SOCKET, outputSocket = INVALID_SOCKET;
 	HANDLE inputSocketDup = INVALID_HANDLE_VALUE, outputSocketDup = INVALID_HANDLE_VALUE;
 	int iMode = 0;
@@ -129,39 +143,105 @@ DWORD main(int argc, char **argv)
 		}
 	}
 
-	STARTUPINFO siStartInfo;
-	PROCESS_INFORMATION piProcInfo; 
-	
-	ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
+	// Find out how many processes we need to spawn
+	int numProcesses = 0;
+	LPSTR token = strtok(command, "|");
+	while (token) {
+		numProcesses++;
+		token = strtok(NULL, "|");
+	}
+	fprintf(stderr, "Command line contains %d processes\n", numProcesses);
 
-	ZeroMemory( &siStartInfo, sizeof(STARTUPINFO) );
-	siStartInfo.cb = sizeof(STARTUPINFO); 
-	siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-	siStartInfo.hStdOutput = (outputSocketDup == INVALID_HANDLE_VALUE) ? GetStdHandle(STD_OUTPUT_HANDLE) : outputSocketDup;
-	siStartInfo.hStdInput = (inputSocketDup == INVALID_HANDLE_VALUE) ? GetStdHandle(STD_INPUT_HANDLE) : inputSocketDup;
-	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
-
-	BOOL bFuncRetn; 
-	bFuncRetn = CreateProcess(NULL, 
-				  command,   // command line 
-				  NULL,      // process security attributes 
-				  NULL,      // primary thread security attributes 
-				  TRUE,      // handles are inherited 
-				  0,         // creation flags 
-				  NULL,      // use parent's environment 
-				  NULL,      // use parent's current directory 
-				  &siStartInfo,  // STARTUPINFO pointer 
-				  &piProcInfo);  // receives PROCESS_INFORMATION 
-	if (bFuncRetn == 0) {
-		fprintf(stderr, "Error creating child process: %d\n", 
-			GetLastError());
-		return -1;
+	// Allocate process handle array
+	PHANDLE pProcessHandles = new HANDLE[numProcesses];
+	PHANDLE pThreadHandles = new HANDLE[numProcesses];
+	for (int i = 0; i < numProcesses; i++) {
+		pProcessHandles[i] = INVALID_HANDLE_VALUE;
+		pThreadHandles[i] = INVALID_HANDLE_VALUE;
 	}
 
-	WaitForSingleObject(piProcInfo.hProcess, INFINITE);
+	// Now create the processes and the pipes between them
+	token = command;
+	HANDLE hNextInput = (inputSocketDup == INVALID_HANDLE_VALUE) ? 
+		GetStdHandle(STD_INPUT_HANDLE) : inputSocketDup;
+	for (int i = 0; i < numProcesses; i++) {
+		fprintf(stderr, "Handling process %d with command line %s\n", i, token);
+		HANDLE hInput = hNextInput, hOutput;
+		// If this is the last process, use the output socket
+		if (i == numProcesses-1) {
+			fprintf(stderr, "Using ouput socket\n", token);
+			hOutput = (outputSocketDup == INVALID_HANDLE_VALUE) ? 
+				GetStdHandle(STD_OUTPUT_HANDLE) : outputSocketDup;
+		}
+		// Otherwise, create a pipe to connect to the next process
+		else {
+			fprintf(stderr, "Creating a pipe\n", token);
 
-	CloseHandle(piProcInfo.hProcess);
-	CloseHandle(piProcInfo.hThread);
+			SECURITY_ATTRIBUTES saAttr; 
+
+			saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+			saAttr.bInheritHandle = TRUE; 
+			saAttr.lpSecurityDescriptor = NULL; 
+			
+			HANDLE hPipeReader, hPipeWriter;
+			if (!CreatePipe(&hPipeReader,
+							&hPipeWriter, 
+							&saAttr, 0)) {
+				fprintf(stderr, "Error creating pipe: %d\n", 
+					GetLastError());
+				return -1;
+			}
+
+			hOutput = hPipeWriter;
+			hNextInput = hPipeReader;
+		}
+
+		STARTUPINFO siStartInfo;
+		PROCESS_INFORMATION piProcInfo; 
+	
+		ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
+
+		ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
+		siStartInfo.cb = sizeof(STARTUPINFO); 
+		siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+		siStartInfo.hStdOutput = hOutput;
+		siStartInfo.hStdInput = hInput;
+		siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+		BOOL bFuncRetn; 
+		bFuncRetn = CreateProcess(NULL, 
+								  token,   // command line 
+								  NULL, // process security attributes 
+								  NULL, // primary thread security attributes 
+								  TRUE, // handles are inherited 
+								  0,    // creation flags 
+								  NULL, // use parent's environment 
+								  NULL, // use parent's current directory 
+								  &siStartInfo,  // STARTUPINFO pointer 
+								  &piProcInfo);  // receives PROCESS_INFORMATION 
+		if (bFuncRetn == 0) {
+			fprintf(stderr, "Error creating child process: %d\n", 
+				GetLastError());
+			KillAllProcesses(pProcessHandles, numProcesses);
+			return -1;
+		}
+
+		pProcessHandles[i] = piProcInfo.hProcess;
+		pThreadHandles[i] = piProcInfo.hThread;
+		// Skip over null and leading space
+		token += strlen(token) + 2;
+	}		
+
+	// Wait until at least one process dies
+	WaitForMultipleObjects(numProcesses, pProcessHandles, FALSE, INFINITE);
+
+	// As soon as one dies, kill all the rest so none stick around
+	KillAllProcesses(pProcessHandles, numProcesses);
+	for (int i = 0; i < numProcesses; i++) {
+		CloseHandle(pThreadHandles[i]);
+	}
+	delete [] pProcessHandles;
+	delete [] pThreadHandles;
 
 	if (inputSocket != INVALID_SOCKET) {
 		closesocket(inputSocket);
