@@ -40,7 +40,7 @@ printUsage() {
 
 DWORD main(int argc, char **argv) 
 {
-	USHORT inputPort = -1, outputPort = -1;
+	USHORT inputPort = 0, outputPort = 0;
 	LPSTR command = NULL;
 
 	char c;
@@ -81,7 +81,7 @@ DWORD main(int argc, char **argv)
 	
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	if (inputPort != -1) {
+	if (inputPort != 0) {
 		inputSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
 		if (inputSocket == INVALID_SOCKET) {
 			fprintf(stderr, "Error creating input socket: %d\n", WSAGetLastError());
@@ -105,7 +105,7 @@ DWORD main(int argc, char **argv)
 		}
 	}
 
-	if (outputPort != -1) {
+	if (outputPort != 0) {
 		outputSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
 		if (outputSocket == INVALID_SOCKET) {
 			fprintf(stderr, "Error creating output socket: %d\n", WSAGetLastError());
