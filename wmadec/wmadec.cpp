@@ -41,6 +41,7 @@
 
 #define ONE_SECOND (QWORD)10000000
 static char* gOptionStr = "qhb:r:n:o:";
+#define STREAM_BUFFER_SIZE 1024
 
 class WMAStream : public IStream {
 public:
@@ -99,11 +100,15 @@ protected:
 
   LONG    m_cRef;
   FILE*   m_pFile;
+  BYTE    m_pBuf[STREAM_BUFFER_SIZE];
+  size_t    m_lBytes;
+  size_t    m_lPosition;
 };
 
 WMAStream::WMAStream(FILE* pFile) 
   :  m_pFile(pFile) {
   m_cRef = 0;
+  m_lBytes = m_lPosition = 0;
 }
 
 WMAStream::~WMAStream() {
@@ -152,11 +157,16 @@ WMAStream::Release() {
 
 HRESULT STDMETHODCALLTYPE 
 WMAStream::Read(void *pv, ULONG cb, ULONG *pcbRead) {
+
   size_t numread = fread(pv, sizeof(char), (size_t)cb, m_pFile);
+
   if (pcbRead) {
     *pcbRead = (ULONG)numread;
   }
+
   if (ferror(m_pFile)) {
+    fprintf(stderr, "Reading from stream failed with error %d\n", 
+	    ferror(m_pFile));
     return S_FALSE;
   }
 
@@ -167,33 +177,20 @@ HRESULT STDMETHODCALLTYPE
 WMAStream::Seek(LARGE_INTEGER dlibMove, 
 		DWORD dwOrigin, 
 		ULARGE_INTEGER *plibNewPosition) {
-  if (fseek(m_pFile, dlibMove.LowPart, dwOrigin)) {
-    return E_UNEXPECTED;
-  }
-
-  if (plibNewPosition) {
-    plibNewPosition->LowPart = ftell(m_pFile);
-  }
-
-  return S_OK;
+  return E_FAIL;
 }
 
 HRESULT STDMETHODCALLTYPE 
 WMAStream::Stat(STATSTG *pstatstg, DWORD grfStatFlag) {
-  struct stat buf;
 
   if(!pstatstg || (grfStatFlag != STATFLAG_NONAME)) {
     return E_INVALIDARG;
   }
 
-  if (fstat(fileno(m_pFile), &buf) == -1) {
-    return E_UNEXPECTED;
-  }
-
   memset(pstatstg, 0, sizeof(STATSTG));
   
   pstatstg->type = STGTY_STREAM;
-  pstatstg->cbSize.LowPart = buf.st_size;
+  pstatstg->cbSize.LowPart = 0;
 
   return S_OK;
 }
@@ -643,11 +640,12 @@ WMAReader::Decode(IStream* lpInput, FILE* pOutput) {
   
   IWMReaderAdvanced2 *pAdvanced2 = NULL;
   hr = m_pReader->QueryInterface(IID_IWMReaderAdvanced2, 
-				 (void**)pAdvanced2);
+				 (void**)&pAdvanced2);
   if (FAILED(hr)) {
     fprintf(stderr, "Error QIing WMA reader 0x%x\n", hr);
     return hr;
   }
+  pAdvanced2->SetPlayMode(WMT_PLAY_MODE_STREAMING);
 
   hr = pAdvanced2->OpenStream(lpInput, this, NULL);
   if (SUCCEEDED(hr)) {
@@ -756,7 +754,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				     dwSamplesPerSec,
 				     dwNumChannels);
   pReader->AddRef();
-  if (optind < argc) {
+  if ((optind < argc) && (strcmp(argv[optind], "-") != 0)) {
     pReader->Decode(argv[optind], pOutputHandle);
   }
   else {
