@@ -182,33 +182,34 @@ static pascal Boolean SoundConverterFillBufferDataProc(SoundComponentDataPtr *ou
             pFillData->compData.bufferSize = 0;		
             pFillData->compData.commonFrameSize = 0;
             
-			if ((err != noErr) && (getDataParams.dataSize > 0)) {
+            if ((err != noErr) && (getDataParams.dataSize > 0)) {
 #ifdef WIN32
-				fprintf(stderr, "InvokeMovieExportGetDataUPP - Failed in FillBufferDataProc");
+                fprintf(stderr, "InvokeMovieExportGetDataUPP - Failed in FillBufferDataProc");
 #else
                 DebugStr("\pInvokeMovieExportGetDataUPP - Failed in FillBufferDataProc");
 #endif
-			}
+            }
         }
+        else {
+            pFillData->currentTime += convertTime(getDataParams.actualSampleCount, (pFillData->compData.desc.sampleRate >> 16), pFillData->timescale) * getDataParams.durationPerSample;
         
-        pFillData->currentTime += convertTime(getDataParams.actualSampleCount, (pFillData->compData.desc.sampleRate >> 16), pFillData->timescale) * getDataParams.durationPerSample;
-        
-		// Indicate whether we have more data in the source file. This is redundant with 
-		// some of the other checks we do above, but proves to be necessary in some cases
-		// (crashes were reported with Apple Lossless encoded files, for example).
-		pFillData->isThereMoreSource = (pFillData->currentTime < pFillData->duration);
+            // Indicate whether we have more data in the source file. This is redundant with 
+            // some of the other checks we do above, but proves to be necessary in some cases
+            // (crashes were reported with Apple Lossless encoded files, for example).
+            pFillData->isThereMoreSource = (pFillData->currentTime < pFillData->duration);
 
-        // sampleCount is the number of PCM samples
-        pFillData->compData.desc.sampleCount = getDataParams.actualSampleCount;
+            // sampleCount is the number of PCM samples
+            pFillData->compData.desc.sampleCount = getDataParams.actualSampleCount;
         
-        // point to our sound data
-        pFillData->compData.desc.buffer = (unsigned char *)getDataParams.dataPtr;
+            // point to our sound data
+            pFillData->compData.desc.buffer = (unsigned char *)getDataParams.dataPtr;
         
-        // kExtendedSoundBufferSizeValid was specified - make sure this field is filled in correctly
-        pFillData->compData.bufferSize = getDataParams.dataSize;
+            // kExtendedSoundBufferSizeValid was specified - make sure this field is filled in correctly
+            pFillData->compData.bufferSize = getDataParams.dataSize;
         
-        // for VBR audio we specified the kExtendedSoundCommonFrameSizeValid flag - make sure this field is filled in correctly
-        if (pFillData->isSourceVBR) pFillData->compData.commonFrameSize = getDataParams.dataSize / pFillData->compData.desc.sampleCount;
+            // for VBR audio we specified the kExtendedSoundCommonFrameSizeValid flag - make sure this field is filled in correctly
+            if (pFillData->isSourceVBR) pFillData->compData.commonFrameSize = getDataParams.dataSize / pFillData->compData.desc.sampleCount;
+        }
     }
     
     // set outData to a properly filled out ExtendedSoundComponentData struct
