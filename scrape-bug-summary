@@ -1,0 +1,59 @@
+#!/usr/bin/perl -w
+
+# $Id$
+#
+# Simple script to scrape the bug summaries from Bugzilla for inclusion in the changelog.
+# 
+# It will write out two files - a plain text for sending email, and an HTMLized version.
+
+use strict;
+use lib qw(CPAN);
+use LWP::Simple;
+
+sub main {
+
+	my $url  = 'http://bugs.slimdevices.com/show_bug.cgi?id=%d';
+
+	my $file = $ARGV[0] || die "Usage $0 <file>\n";
+
+	open FH, $file or die $!;
+
+	open OUTHTML, ">bugs.html" or die $!;
+	open OUTTEXT, ">bugs.txt"  or die $!;
+
+	while (my $bug = <FH>) {
+
+		chomp $bug;
+
+		print "Fetching summary for bug $bug..\n";
+
+		my $content = get(sprintf($url, $bug));
+		my $summary = '';
+
+		for my $line (split /\n/, $content) {
+
+			if ($line =~ m|Bugzilla Bug $bug: (.+?)</div>$|) {
+
+				$summary = $1;
+				last;
+			}
+		}
+
+		unless ($summary) {
+			print "Couldn't find a summary for bug $bug - please check it manually.\n";
+		}
+
+		printf(OUTTEXT "\t#%.4d - %s\n\n", $bug, $summary);
+
+		# <li><a href="http://bugs.slimdevices.com/show_bug.cgi?id=121">#121</a> - 
+		printf(OUTHTML "\t\t\t<li><a href=\"%s\">#%.4d</a> - %s\n", sprintf($url, $bug), $bug, $summary);
+	}
+
+	close FH;
+	close OUTTEXT;
+	close OUTHTML;
+}
+
+main();
+
+__END__
