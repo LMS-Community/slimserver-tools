@@ -13,7 +13,7 @@
 # L. Hollevoet
 #
 
-$language = "NL";                  # language to update
+$language = "NO";                  # language to update
 @display  = ("EN", "DE", "FR");    # display these languages as 'hints'
 
 # Open input and output files
