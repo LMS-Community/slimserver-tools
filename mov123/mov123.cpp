@@ -32,6 +32,9 @@
 //
 
 #include <stdio.h>
+#include <fcntl.h>
+#include <io.h>
+
 #ifdef WIN32
 #include "stdafx.h"
 #include "Movies.h"
@@ -76,6 +79,7 @@ int main(int argc, char *argv[])
 	outFile = stdout;
 
 #ifdef WIN32
+	setmode(fileno(outFile), O_BINARY);	
 	InitializeQTML(0);                        // Initialize QTML
 #endif
 	EnterMovies();

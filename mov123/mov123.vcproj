@@ -62,6 +62,7 @@
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/I &quot;E:\dean\QTDevWin\CIncludes&quot;"
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				OmitFramePointers="TRUE"
@@ -69,7 +70,7 @@
 				StringPooling="TRUE"
 				RuntimeLibrary="4"
 				EnableFunctionLevelLinking="TRUE"
-				UsePrecompiledHeader="3"
+				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"/>
@@ -77,6 +78,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalOptions="/VERBOSE:LIB /NODEFAULTLIB:LIBCMT"
 				OutputFile="$(OutDir)/mov123.exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="TRUE"
