@@ -1,0 +1,776 @@
+
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* ***** BEGIN LICENSE BLOCK *****
+* Version: MPL 1.1/GPL 2.0/LGPL 2.1
+*
+* The contents of this file are subject to the Mozilla Public
+* License Version 1.1 (the "License"); you may not use this file
+* except in compliance with the License. You may obtain a copy of
+* the License at http://www.mozilla.org/MPL/
+* 
+* Software distributed under the License is distributed on an "AS
+* IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+* implied. See the License for the specific language governing
+* rights and limitations under the License.
+* 
+* The Original Code is the Command-line WMA decoder.
+* 
+* The Initial Developer of the Original Code is Vidur Apparao.
+* Portions created by the Initial Developer are Copyright (C) 2004
+* the Initial Developer. All Rights Reserved.
+* 
+* Contributor(s):
+* 
+* Alternatively, the contents of this file may be used under the
+* terms of the GNU General Public License Version 2 or later (the
+* "GPL"), in which case the provisions of the GPL are applicable 
+* instead of those above.  If you wish to allow use of your 
+* version of this file only under the terms of the GPL and not to
+* allow others to use your version of this file under the MPL,
+* indicate your decision by deleting the provisions above and
+* replace them with the notice and other provisions required by
+* the GPL.  If you do not delete the provisions above, a recipient
+* may use your version of this file under either the MPL or the
+* GPL.
+*
+* ***** END LICENSE BLOCK ***** */
+
+
+#include "stdafx.h"
+#include "getopt.h"
+
+#define ONE_SECOND (QWORD)10000000
+static char* gOptionStr = "qhb:r:n:o:";
+
+class WMAStream : public IStream {
+public:
+
+  WMAStream(FILE* pFile);
+
+  // IUnknown methods
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject);
+  ULONG STDMETHODCALLTYPE AddRef();
+  ULONG STDMETHODCALLTYPE Release();
+  
+  // IStream methods
+  HRESULT STDMETHODCALLTYPE Read(void *pv, ULONG cb, ULONG *pcbRead);
+  HRESULT STDMETHODCALLTYPE Seek(LARGE_INTEGER dlibMove, 
+				 DWORD dwOrigin, 
+				 ULARGE_INTEGER *plibNewPosition);
+  HRESULT STDMETHODCALLTYPE Stat(STATSTG *pstatstg, DWORD grfStatFlag);
+  
+  // Unimplemented methods of IStream
+  HRESULT STDMETHODCALLTYPE Write(void const *pv, 
+				  ULONG cb, 
+				  ULONG *pcbWritten ) {
+    return(E_NOTIMPL);
+  }
+  HRESULT STDMETHODCALLTYPE SetSize(ULARGE_INTEGER libNewSize) {
+    return(E_NOTIMPL);
+  }
+  HRESULT STDMETHODCALLTYPE CopyTo(IStream *pstm, 
+				   ULARGE_INTEGER cb, 
+				   ULARGE_INTEGER *pcbRead, 
+				   ULARGE_INTEGER *pcbWritten) {
+    return(E_NOTIMPL);
+  }
+  HRESULT STDMETHODCALLTYPE Commit(DWORD grfCommitFlags) {
+    return(E_NOTIMPL);
+  }
+  HRESULT STDMETHODCALLTYPE Revert() {
+    return(E_NOTIMPL);
+  }
+  HRESULT STDMETHODCALLTYPE LockRegion(ULARGE_INTEGER libOffset, 
+				       ULARGE_INTEGER cb, 
+				       DWORD dwLockType) {
+    return(E_NOTIMPL);
+  }
+  HRESULT STDMETHODCALLTYPE UnlockRegion(ULARGE_INTEGER libOffset, 
+					 ULARGE_INTEGER cb, 
+					 DWORD dwLockType) {
+    return(E_NOTIMPL);
+  }
+  HRESULT STDMETHODCALLTYPE Clone(IStream **ppstm) {
+    return(E_NOTIMPL);
+  }
+
+protected:
+  ~WMAStream();
+
+  LONG    m_cRef;
+  FILE*   m_pFile;
+};
+
+WMAStream::WMAStream(FILE* pFile) 
+  :  m_pFile(pFile) {
+  m_cRef = 0;
+}
+
+WMAStream::~WMAStream() {
+}
+
+HRESULT STDMETHODCALLTYPE 
+WMAStream::QueryInterface(REFIID iid,
+			  void **ppvObject) {
+  HRESULT hr = S_OK;
+        
+  if(NULL == ppvObject) {
+    hr = E_POINTER;
+  }
+  else {
+    *ppvObject = NULL;
+  }
+        
+  if(SUCCEEDED(hr)) {
+    if(IsEqualIID(iid, IID_IUnknown) || 
+       IsEqualIID(iid, IID_IStream)) {
+      *ppvObject = static_cast<IStream*>(this);
+      AddRef();
+    }
+    else {
+      hr = E_NOINTERFACE;
+    }
+  }
+        
+  return hr;
+}
+
+ULONG STDMETHODCALLTYPE 
+WMAStream::AddRef() {
+  return ::InterlockedIncrement(&m_cRef);
+}
+
+ULONG STDMETHODCALLTYPE 
+WMAStream::Release() {
+  LONG lRefCount = ::InterlockedDecrement(&m_cRef);
+  if(0 == lRefCount) {
+    delete this;
+  }
+        
+  return lRefCount;
+}
+
+HRESULT STDMETHODCALLTYPE 
+WMAStream::Read(void *pv, ULONG cb, ULONG *pcbRead) {
+  size_t numread = fread(pv, sizeof(char), (size_t)cb, m_pFile);
+  if (pcbRead) {
+    *pcbRead = (ULONG)numread;
+  }
+  if (ferror(m_pFile)) {
+    return S_FALSE;
+  }
+
+  return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE 
+WMAStream::Seek(LARGE_INTEGER dlibMove, 
+		DWORD dwOrigin, 
+		ULARGE_INTEGER *plibNewPosition) {
+  if (fseek(m_pFile, dlibMove.LowPart, dwOrigin)) {
+    return E_UNEXPECTED;
+  }
+
+  if (plibNewPosition) {
+    plibNewPosition->LowPart = ftell(m_pFile);
+  }
+
+  return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE 
+WMAStream::Stat(STATSTG *pstatstg, DWORD grfStatFlag) {
+  struct stat buf;
+
+  if(!pstatstg || (grfStatFlag != STATFLAG_NONAME)) {
+    return E_INVALIDARG;
+  }
+
+  if (fstat(fileno(m_pFile), &buf) == -1) {
+    return E_UNEXPECTED;
+  }
+
+  memset(pstatstg, 0, sizeof(STATSTG));
+  
+  pstatstg->type = STGTY_STREAM;
+  pstatstg->cbSize.LowPart = buf.st_size;
+
+  return S_OK;
+}
+
+class WMAReader : public IWMReaderCallback, IWMReaderCallbackAdvanced {
+public:
+  WMAReader(WORD wBitsPerSample,
+	    DWORD dwSamplesPerSec,
+	    DWORD dwNumChannels);
+
+  // Two versions, one that takes a file (or URL) name, the other that
+  // takes a stream. The stream path is currently used when getting
+  // input from stdin.
+  HRESULT Decode(LPCSTR lpInput, FILE* pOutput);
+  HRESULT Decode(IStream* lpInput, FILE* pOutput); 
+
+  // IUnknown methods
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject);
+  ULONG STDMETHODCALLTYPE AddRef();
+  ULONG STDMETHODCALLTYPE Release();
+  
+  // IWMReaderCallback methods
+  HRESULT STDMETHODCALLTYPE OnSample(DWORD dwOutputNum,
+				     QWORD cnsSampleTime,
+                                     QWORD cnsSampleDuration,
+                                     DWORD dwFlags,
+                                     INSSBuffer __RPC_FAR *pSample,
+                                     void __RPC_FAR *pvContext);
+  HRESULT STDMETHODCALLTYPE OnStatus(WMT_STATUS Status,
+                                     HRESULT hr,
+                                     WMT_ATTR_DATATYPE dwType,
+                                     BYTE __RPC_FAR *pValue,
+                                     void __RPC_FAR *pvContext);
+
+  // IWMReaderCallbackAdvanced methods
+  HRESULT STDMETHODCALLTYPE OnStreamSample(WORD wStreamNum,
+					   QWORD cnsSampleTime,
+					   QWORD cnsSampleDuration,
+					   DWORD dwFlags,
+					   INSSBuffer *pSample,
+					   void *pvContext) {
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE OnTime(QWORD cnsCurrentTime,
+				   void *pvContext);
+  HRESULT STDMETHODCALLTYPE OnStreamSelection(WORD wStreamCount,
+					      WORD *pStreamNumbers,
+					      WMT_STREAM_SELECTION *pSelections,
+					      void *pvContext) {
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE OnOutputPropsChanged(DWORD dwOutputNum,
+						 WM_MEDIA_TYPE *pMediaType,
+						 void *pvContext) {
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE AllocateForStream(WORD wStreamNum,
+					      DWORD cbBuffer,
+					      INSSBuffer **ppBuffer,
+					      void *pvContext) {
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE AllocateForOutput(DWORD dwOutputNum,
+					      DWORD cbBuffer,
+					      INSSBuffer **ppBuffer,
+					      void *pvContext) {
+    return S_OK;
+  }
+
+
+protected:
+  ~WMAReader();
+  HRESULT Init(FILE* pOutput);
+  HRESULT StartReading();
+
+  LONG m_cRef;
+  BOOL m_bInited;
+
+  WORD m_wBitsPerSample;
+  DWORD m_dwSamplesPerSec;
+  DWORD m_dwNumChannels;
+  
+  IWMReader* m_pReader;
+  IWMReaderAdvanced* m_pReaderAdvanced;
+  FILE* m_pOutput;
+  HANDLE m_hEvent;
+  HRESULT m_hrAsync;
+  DWORD m_dwOutputNum;
+  QWORD m_qwReaderTime;
+};
+
+WMAReader::WMAReader(WORD wBitsPerSample,
+		     DWORD dwSamplesPerSec,
+		     DWORD dwNumChannels)
+  : m_wBitsPerSample(wBitsPerSample), m_dwSamplesPerSec(dwSamplesPerSec),
+  m_dwNumChannels(dwNumChannels) {
+  m_cRef = 0;
+  m_pReader = NULL;
+  m_pReaderAdvanced = NULL;
+  m_bInited = FALSE;
+  m_hEvent = NULL;
+  m_hrAsync = S_OK;
+  m_dwOutputNum = -1;
+  m_qwReaderTime = (QWORD)0;
+}
+
+WMAReader::~WMAReader() {
+  if (m_pReader) {
+    m_pReader->Release();
+  }
+  if (m_pReaderAdvanced) {
+    m_pReaderAdvanced->Release();
+  }
+  if (m_hEvent) {
+    CloseHandle(m_hEvent);
+  }
+}
+
+HRESULT STDMETHODCALLTYPE 
+WMAReader::QueryInterface(REFIID iid,
+			  void  **ppvObject) {
+  HRESULT hr = S_OK;
+        
+  if(NULL == ppvObject) {
+    hr = E_POINTER;
+  }
+  else {
+    *ppvObject = NULL;
+  }
+        
+  if(SUCCEEDED(hr)) {
+    if(IsEqualIID(iid, IID_IUnknown) || 
+       IsEqualIID(iid, IID_IWMReaderCallback)) {
+      *ppvObject = static_cast<IWMReaderCallback*>(this);
+      AddRef();
+    }
+    else if (IsEqualIID(iid, IID_IWMReaderCallbackAdvanced)) {
+      *ppvObject = static_cast<IWMReaderCallbackAdvanced*>(this);
+      AddRef();
+    }
+    else {
+      hr = E_NOINTERFACE;
+    }
+  }
+        
+  return hr;
+}
+
+ULONG STDMETHODCALLTYPE 
+WMAReader::AddRef() {
+  return ::InterlockedIncrement(&m_cRef);
+}
+
+ULONG STDMETHODCALLTYPE 
+WMAReader::Release() {
+  LONG lRefCount = ::InterlockedDecrement(&m_cRef);
+  if(0 == lRefCount) {
+    delete this;
+  }
+        
+  return lRefCount;
+}
+
+HRESULT
+WMAReader::Init(FILE* pOutput) {
+  HRESULT hr = S_OK;
+  if (!m_bInited) {
+    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    if(FAILED(hr)) {
+      fprintf(stderr, "COM initialization failed with error code 0x%x\n", hr);
+      return hr;
+    }
+
+    hr = WMCreateReader(NULL, WMT_RIGHT_PLAYBACK, &m_pReader);
+    if (FAILED(hr)) {
+      fprintf(stderr, "Creating WMA reader failed with error code 0x%x\n", hr);
+      return hr;
+    }
+
+    hr = m_pReader->QueryInterface(IID_IWMReaderAdvanced, 
+				   (void**)&m_pReaderAdvanced);
+    if (FAILED(hr)) {
+      fprintf(stderr, "Error QIing WMA reader 0x%x\n", hr);
+      return hr;
+    }
+    
+    m_hEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (!m_hEvent) {
+      hr = HRESULT_FROM_WIN32(GetLastError());
+      fprintf(stderr, "Creating Win32 Event failed with error code 0x%x\n", 
+	      hr);
+      return hr;
+    }
+    m_pOutput = pOutput;
+    m_bInited = TRUE;
+  }
+
+  return hr;
+}
+
+HRESULT STDMETHODCALLTYPE 
+WMAReader::OnSample(DWORD dwOutputNum,
+		    QWORD cnsSampleTime,
+		    QWORD cnsSampleDuration,
+		    DWORD dwFlags,
+		    INSSBuffer __RPC_FAR *pSample,
+		    void __RPC_FAR *pvContext) {
+  if (dwOutputNum != m_dwOutputNum) {
+    return S_OK;
+  }
+
+  BYTE *pData = NULL;
+  DWORD cbData = 0;
+  HRESULT hr = pSample->GetBufferAndLength(&pData, &cbData);
+  if(FAILED(hr)) {
+    return( hr );
+  }
+
+  if (m_pOutput) {
+    if (!fwrite(pData, sizeof(BYTE), cbData, m_pOutput)) {
+      m_hrAsync = -1;
+      SetEvent(m_hEvent);
+    }
+  }
+
+  return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE 
+WMAReader::OnStatus(WMT_STATUS Status,
+		    HRESULT hr,
+		    WMT_ATTR_DATATYPE dwType,
+		    BYTE __RPC_FAR *pValue,
+		    void __RPC_FAR *pvContext) {
+  switch( Status ) {
+    case WMT_OPENED:
+      m_hrAsync = hr;
+      SetEvent(m_hEvent);        
+      break;
+    case WMT_STARTED:
+      m_qwReaderTime = ONE_SECOND;
+      hr = m_pReaderAdvanced->DeliverTime(m_qwReaderTime);
+      if (FAILED(hr)) {
+	m_hrAsync = hr;
+	SetEvent(m_hEvent);        
+      }
+      break;
+    case WMT_EOF:
+    case WMT_END_OF_STREAMING:
+    case WMT_ERROR:
+      m_hrAsync = hr;
+      SetEvent(m_hEvent);        
+      break;
+  }
+
+  return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE 
+WMAReader::OnTime(QWORD cnsCurrentTime,
+		  void *pvContext) {
+  m_qwReaderTime += ONE_SECOND;
+  HRESULT hr = m_pReaderAdvanced->DeliverTime(m_qwReaderTime);
+  if (FAILED(hr)) {
+    m_hrAsync = hr;
+    SetEvent(m_hEvent);        
+  }
+  return S_OK;
+}
+
+HRESULT
+WMAReader::StartReading() {
+
+  // Wait till the open happens
+  WaitForSingleObject(m_hEvent, INFINITE);
+  if (FAILED(m_hrAsync)) {
+    fprintf(stderr, "Opening stream failed with error code 0x%x\n", m_hrAsync);
+    return m_hrAsync;
+  }
+
+  DWORD dwOutputCount;
+  HRESULT hr = m_pReader->GetOutputCount(&dwOutputCount);
+  if (FAILED(hr)) {
+    fprintf(stderr, "Getting output count failed with error code 0x%x\n", hr);
+    return hr;
+  }
+
+  for (DWORD i = 0; i < dwOutputCount, m_dwOutputNum == -1; i++) {
+    IWMOutputMediaProps* pProps;
+    hr = m_pReader->GetOutputProps(i, &pProps);
+    if (FAILED(hr)) {
+      fprintf(stderr, "Getting output props failed with error code 0x%x\n", 
+	      hr);
+      return hr;
+    }
+
+    GUID guidType;
+    hr = pProps->GetType(&guidType);
+    if (SUCCEEDED(hr)) {
+      if (guidType == WMMEDIATYPE_Audio) {
+	m_dwOutputNum = i;
+      }  
+    }
+    else {
+      fprintf(stderr, "Getting output type failed with error code 0x%x\n", 
+	      hr);
+    }
+
+    pProps->Release();
+    if (FAILED(hr)) {
+      return hr;
+    }
+  } 
+
+  if (m_dwOutputNum == -1) {
+      fprintf(stderr, "Couldn't find an audio track in file\n");
+      return E_INVALIDARG;
+  }
+
+  DWORD dwFormatCount;
+  hr = m_pReader->GetOutputFormatCount(m_dwOutputNum, &dwFormatCount);
+  if (FAILED(hr)) {
+    fprintf(stderr, "Getting output format count failed "
+	    "with error code 0x%x\n", hr);
+    return hr;
+  }
+
+  BOOL bFoundMatch = FALSE;
+  for (DWORD i = 0; i < dwFormatCount; i++) {
+    IWMOutputMediaProps* pOutputProps;
+    hr = m_pReader->GetOutputFormat(m_dwOutputNum, i, &pOutputProps);
+    if (FAILED(hr)) {
+      fprintf(stderr, "Getting format output props failed "
+	      "with error code 0x%x\n", hr);
+      break;
+    }
+	  
+    WM_MEDIA_TYPE* pMediaType = NULL;
+    do {
+      ULONG cbType;
+      hr = pOutputProps->GetMediaType(NULL, &cbType);
+      if (FAILED(hr)) {
+	fprintf(stderr, "Getting media type struct size failed "
+		"with error code 0x%x\n", hr);
+	break;
+      }
+      
+      pMediaType = (WM_MEDIA_TYPE*)new BYTE[cbType];
+      hr = pOutputProps->GetMediaType(pMediaType, &cbType);
+      if (FAILED(hr)) {
+	fprintf(stderr, "Getting media type struct failed "
+		"with error code 0x%x\n", hr);
+	break;
+      }
+
+      if (pMediaType->formattype == WMFORMAT_WaveFormatEx) {
+	WAVEFORMATEX* pFormat = (WAVEFORMATEX*)pMediaType->pbFormat;
+
+	if ((pFormat->wFormatTag == WAVE_FORMAT_PCM) &&
+	    (pFormat->nChannels == m_dwNumChannels) &&
+	    (pFormat->nSamplesPerSec == m_dwSamplesPerSec) &&
+	    (pFormat->wBitsPerSample == m_wBitsPerSample)) {
+	  bFoundMatch = TRUE;
+	  hr = m_pReader->SetOutputProps(m_dwOutputNum, pOutputProps);
+	  if (FAILED(hr)) {
+	    fprintf(stderr, "Setting audio output properties failed "
+		    "with error code 0x%x\n", hr);
+	    break;
+	  }
+	}
+      }
+    } while (FALSE);
+
+    if (pMediaType) {
+      delete [] pMediaType;
+    }
+
+    pOutputProps->Release();
+    if (FAILED(hr)) {
+      break;
+    }
+  } 
+
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  if (!bFoundMatch) {
+    fprintf(stderr, "Can't find reader that matches the specified "
+	    "audio output properties\n");
+    return E_INVALIDARG;
+  }
+
+  m_pReaderAdvanced->SetUserProvidedClock(TRUE);
+
+  hr = m_pReader->Start(0, 0, 1.0, NULL);
+  if (FAILED(hr)) {
+    fprintf(stderr, "Attempt to start reading failed "
+	    "with error code 0x%x\n", hr);
+    return hr;
+  }
+
+  WaitForSingleObject(m_hEvent, INFINITE);
+  if (FAILED(m_hrAsync)) {
+    fprintf(stderr, "Reading from stream failed with error code 0x%x\n", 
+	    m_hrAsync);
+    return m_hrAsync;
+  }
+
+  m_pReader->Close();
+
+  return S_OK;
+}
+
+HRESULT
+WMAReader::Decode(LPCSTR lpInput, FILE* pOutput) {
+  HRESULT hr = Init(pOutput);
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  int length = (int)strlen(lpInput);
+  int count = MultiByteToWideChar(CP_ACP, 0, lpInput, length, NULL, 0);
+  LPWSTR pwszURL = new WCHAR[count + 1];
+  MultiByteToWideChar(CP_ACP, 0, lpInput, length, pwszURL, count);
+  pwszURL[count] = (WCHAR)0;
+
+  hr = m_pReader->Open(pwszURL, this, NULL);
+  if (SUCCEEDED(hr)) {
+    hr = StartReading();
+  }
+  else {
+    fprintf(stderr, "Error opening file for reading: 0x%x\n", hr);
+  }
+		  
+  delete [] pwszURL;
+
+  return hr;
+}
+
+HRESULT
+WMAReader::Decode(IStream* lpInput, FILE* pOutput) {
+  HRESULT hr = Init(pOutput);
+  if (FAILED(hr)) {
+    return hr;
+  }
+  
+  IWMReaderAdvanced2 *pAdvanced2 = NULL;
+  hr = m_pReader->QueryInterface(IID_IWMReaderAdvanced2, 
+				 (void**)pAdvanced2);
+  if (FAILED(hr)) {
+    fprintf(stderr, "Error QIing WMA reader 0x%x\n", hr);
+    return hr;
+  }
+
+  hr = pAdvanced2->OpenStream(lpInput, this, NULL);
+  if (SUCCEEDED(hr)) {
+    hr = StartReading();
+  }
+  else {
+    fprintf(stderr, "Error opening stream for reading: 0x%x\n", hr);
+  }
+
+  pAdvanced2->Release();
+  return hr;
+}
+
+void
+printUsage() {
+  fprintf(stderr, 
+	  "wmadec [-qh] [ -b bits_per_sample ] [ -r sample_rate ]\n"
+	  "[ -n num_channels ] [ -o outputfile ] [input]\n"
+	  "-q\n"
+	  "\tSuppresses program output.\n"
+	  "-h\n"
+	  "\tPrint help message.\n"
+	  "-b n\n"
+	  "\tBits per sample of output.  Valid values are 8 or 16 (default)\n"
+	  "-r n\n"
+	  "\tSample rate of output. Default is 44100.\n"
+	  "-n n\n"
+	  "\tNumber of channels of output. Default is 2\n"
+	  "-o filename\n"
+	  "\tWrite output to specified filename.  Default is stdout.\n");
+}
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+  BOOL bQuiet = FALSE;
+  WORD wBitsPerSample = 16;
+  DWORD dwSamplesPerSec = 44100;
+  DWORD dwNumChannels = 2;
+  LPCSTR pOutputFile = NULL;
+  FILE* pOutputHandle = stdout;
+  BOOL bUsage = FALSE;
+
+  char c;
+  while ((c = getopt(argc, argv, gOptionStr)) != EOF) {
+    switch(c) {
+      case 'q':
+	bQuiet = TRUE;
+	break;
+      case 'h':
+      case 'v':
+	bUsage = TRUE;
+	break;
+      case 'b':
+	wBitsPerSample = atoi(optarg);
+	if (wBitsPerSample != 8 && wBitsPerSample != 16) {
+	  fprintf(stderr, 
+		  "Illegal value passed for bits per sample parameter\n");
+	  bUsage = TRUE;
+	}
+	break;
+      case 'r':
+	dwSamplesPerSec = atoi(optarg);
+	if (dwSamplesPerSec <= 0) {
+	  fprintf(stderr, 
+		  "Illegal value passed for sample rate parameter\n");
+	  bUsage = TRUE;
+	}
+	break;
+      case 'n':
+	dwNumChannels = atoi(optarg);
+	if (dwNumChannels <= 0) {
+	  fprintf(stderr, 
+		  "Illegal value passed for number of channels parameter\n");
+	  bUsage = TRUE;
+	}
+	break;
+      case 'o':	
+	pOutputFile = optarg;
+	break;
+      case '\0': 
+	bUsage = TRUE;
+    }
+  }
+
+  if (bUsage) {
+    printUsage();
+    exit(1);
+  }
+
+  if (bQuiet) {
+    pOutputHandle = NULL;
+  }
+  // Open the output file if one is specified.
+  else if (pOutputFile) {
+    pOutputHandle = fopen(pOutputFile, "w+b");
+    if (!pOutputHandle) {
+      fprintf(stderr, "Error opening file %s for writing\n", pOutputFile);
+    }
+  }
+  else {
+    setmode(fileno(stdout), O_BINARY);	
+    pOutputHandle = stdout;
+  }
+
+  WMAReader* pReader = new WMAReader(wBitsPerSample,
+				     dwSamplesPerSec,
+				     dwNumChannels);
+  pReader->AddRef();
+  if (optind < argc) {
+    pReader->Decode(argv[optind], pOutputHandle);
+  }
+  else {
+    setmode(fileno(stdin), O_BINARY);	
+    WMAStream* pStream = new WMAStream(stdin);
+    pStream->AddRef();
+    pReader->Decode(pStream, pOutputHandle);    
+    pStream->Release();
+  }
+  pReader->Release();
+  if (pOutputHandle && pOutputFile) {
+    fclose(pOutputHandle);
+  }
+  
+  return 0;
+}
+
