@@ -18,7 +18,7 @@
 #
 # History:
 # 0.1 - Inital version for CLI in SlimServer 5.4.1
-# 0.2 - For CLI in SlimServer 6.0.x
+# 0.2 - For CLI in SlimServer 6.1
 # ********************************************************************
 
 
