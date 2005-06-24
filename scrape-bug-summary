@@ -8,6 +8,7 @@
 
 use strict;
 use lib qw(CPAN);
+use HTML::Entities;
 use LWP::Simple;
 
 sub main {
@@ -43,7 +44,7 @@ sub main {
 			print "Couldn't find a summary for bug $bug - please check it manually.\n";
 		}
 
-		printf(OUTTEXT "\t#%.4d - %s\n\n", $bug, $summary);
+		printf(OUTTEXT "\t#%.4d - %s\n\n", $bug, decode_entities($summary));
 
 		# <li><a href="http://bugs.slimdevices.com/show_bug.cgi?id=121">#121</a> - 
 		printf(OUTHTML "\t\t\t<li><a href=\"%s\">#%.4d</a> - %s\n", sprintf($url, $bug), $bug, $summary);
