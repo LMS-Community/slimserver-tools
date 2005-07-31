@@ -40,6 +40,7 @@
 # History:
 # 0.1 - Inital version for CLI in SlimServer 5.4.1
 # 6.1 - For CLI in SlimServer 6.1
+# 6.2 - For CLI in SlimServer 6.2
 # ******************************************************************************
 
 # ******************************************************************************
@@ -135,6 +136,8 @@ my %gsonginfoFields = (
 	'url'					=> 'u',
 );
 
+# Restore flags
+my $gRestoreGroupDisc;
 
 
 # ******************************************************************************
@@ -143,21 +146,24 @@ my %gsonginfoFields = (
 
 print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.1\n\n";
 			
-#testConnectDisconnect();
-#testGeneral();
-#testPlayersQueries();
-#testPlayersSleep();
-#testPlayersPower();
-#testPlayersMixer();
-#testPlayersDisplay();
-#testDatabaseRescan();
-#testDatabaseGenres();
-#testDatabaseAlbums();
-#testDatabaseArtists();
-#testDatabaseTitles();
+testConnectDisconnect();
+testGeneral();
+testPlayersQueries();
+testPlayersSleep();
+testPlayersPower();
+testPlayersMixer();
+testPlayersDisplay();
+testDatabaseRescan();
+testDatabaseGenres();
+testDatabaseAlbums();
+testDatabasePlaylists();
+testDatabaseArtists();
+testDatabaseTitles();
 testDatabaseSonginfo();
 
 test_PrintReport();
+
+restoreFlags();
 
 cliDisconnect();
 print "Done!\n\n";
@@ -984,7 +990,7 @@ sub testDatabaseGenres {
 
 	
 	if (test_canRun($tid)) {
-		__testDatabaseGenreAlbumArtist($tid, 'genre');
+		__testDatabaseGenreAlbumArtistPlaylist($tid, 'genre');
 
 	}
 
@@ -1006,7 +1012,7 @@ sub testDatabaseAlbums {
 
 	
 	if (test_canRun($tid)) {
-		__testDatabaseGenreAlbumArtist($tid, 'album');
+		__testDatabaseGenreAlbumArtistPlaylist($tid, 'album');
 	}
 
 	test_Done($tid);
@@ -1027,7 +1033,28 @@ sub testDatabaseArtists {
 
 	
 	if (test_canRun($tid)) {
-		__testDatabaseGenreAlbumArtist($tid, 'artist');
+		__testDatabaseGenreAlbumArtistPlaylist($tid, 'artist');
+	}
+
+	test_Done($tid);
+}
+
+# ---------------------------------------------
+# testDatabasePlaylists()
+# ---------------------------------------------
+sub testDatabasePlaylists {
+	$gd_sub && p_sub("testDatabasePlaylists()");
+
+	# define test
+	my $tid = test_New("playlists query");
+	
+	# pre-conditions
+	test_canConnect($tid);
+	test_canDB($tid);
+
+	
+	if (test_canRun($tid)) {
+		__testDatabaseGenreAlbumArtistPlaylist($tid, 'playlist');
 	}
 
 	test_Done($tid);
@@ -1049,29 +1076,30 @@ sub __callString {
 	return $res;
 }
 
-sub __testDatabaseGenreAlbumArtist {
+sub __testDatabaseGenreAlbumArtistPlaylist {
 	my $tid = shift;
 	my $call = shift;
 	my @params = @_;
 
-	$gd_sub && p_sub("__testDatabaseGenreAlbumArtist($tid, $call, @params)");
+	$gd_sub && p_sub("__testDatabaseGenreAlbumArtistPlaylist($tid, $call, @params)");
 
 	$gd_subtest && print("\nTesting \"" . __callString($call, @params) . "\"\n");
 
 	# get the suckers...
 	my %DB;
-	my %cliCall = cliGenresAlbumsArtists($call, undef, @params);
+	my %cliCall = cliGenresAlbumsArtistsPlaylists($call, undef, @params);
 	my $num = $cliCall{'count'};
 	for(my $i = 0; $i < $num; $i++) {
-		%cliCall = cliGenresAlbumsArtists($call, $i, @params);
+		%cliCall = cliGenresAlbumsArtistsPlaylists($call, $i, @params);
 		$DB{$cliCall{$call}} = $cliCall{'id'};
 	}
 	
 	if (!@params) {
-		# At the top level, tests it matches simple call
+		# At the top level, tests it matches simple call (not for playlists)
+		
 		test_SubTest($tid, 
 					__callString($call, @params) . ".count == info total ${call}s ?",
-					$num == cliQueryNum(undef, ['info', 'total', "${call}s"])); 				
+					$num == cliQueryNum(undef, ['info', 'total', "${call}s"])) if $call ne 'playlist'; 				
 	}
 	else {
 		# Test we have more than 0
@@ -1103,11 +1131,11 @@ sub __testDatabaseGenreAlbumArtist {
 	else {
 		push @paramsearch, "search:$searchparam";
 	}
-	%cliCall = cliGenresAlbumsArtists($call, undef, @paramsearch);
+	%cliCall = cliGenresAlbumsArtistsPlaylists($call, undef, @paramsearch);
 	my $numsearch = $cliCall{'count'};
 
 	for(my $i = 0; $i < $numsearch; $i++) {
-		%cliCall = cliGenresAlbumsArtists($call, $i, @paramsearch);
+		%cliCall = cliGenresAlbumsArtistsPlaylists($call, $i, @paramsearch);
 		$DBsearch{$cliCall{$call}} = $cliCall{'id'};
 	}
 
@@ -1129,94 +1157,159 @@ sub __testDatabaseGenreAlbumArtist {
 				__callString($call, @paramsearch) . " \'$searchparam\' returns \'$searchparam\'",
 				$found); 
 
-	# Now test cross-references!
-	my $totGenres = 0;
-	my $totArtists = 0;
-	my $totAlbums = 0;
-	my $totSongs = 0;
+	if ($call ne 'playlist') {
 	
-	my $hasGenre = 0;
-	my $hasArtist = 0;
-	my $hasAlbum = 0;
-	
-	foreach my $p (@params) {
-		$hasGenre = 1 if $p =~ /genre/;
-		$hasArtist = 1 if $p =~ /artist/;
-		$hasAlbum = 1 if $p =~ /album/;
-	}
-	
-	my @params2;
-	while ( my ($key, $value) = each(%DB) ) {
-
-		# Add us to the params...
-		@params2 = @params;
-		if (randomSmaller(2) == 1) {
-			unshift @params2, "${call}_id:$value";
-		}
-		else {
-			push @params2, "${call}_id:$value";
-		}
-
-		if ($call ne 'genre' && !$hasGenre) {
-			$totGenres += __testDatabaseGenreAlbumArtist($tid, 'genre', @params2);
-		}
-		if ($call ne 'artist' && !$hasArtist) {
-			$totArtists += __testDatabaseGenreAlbumArtist($tid, 'artist', @params2);
-		}
-		if ($call ne 'album' && !$hasAlbum) {
-			$totAlbums += __testDatabaseGenreAlbumArtist($tid, 'album', @params2);
-		}
-		{
-			my %cliCall = cliTitles(undef, @params2);
-			my $count = $cliCall{'count'};
-			test_SubTest(	$tid, 
-							__callString('title', @params2) . ".count > 0",
-							$count > 0); 				
-			$totSongs += $count;			
+		# Now test cross-references!
+		my $totGenres = 0;
+		my $totArtists = 0;
+		my $totAlbums = 0;
+		my $totSongs = 0;
+		
+		my $hasGenre = 0;
+		my $hasArtist = 0;
+		my $hasAlbum = 0;
+		
+		foreach my $p (@params) {
+			$hasGenre = 1 if $p =~ /genre/;
+			$hasArtist = 1 if $p =~ /artist/;
+			$hasAlbum = 1 if $p =~ /album/;
 		}
 		
-	}
+		my @params2;
+		while ( my ($key, $value) = each(%DB) ) {
+	
+			# Add us to the params...
+			@params2 = @params;
+			if (randomSmaller(2) == 1) {
+				unshift @params2, "${call}_id:$value";
+			}
+			else {
+				push @params2, "${call}_id:$value";
+			}
+	
+			if ($call ne 'genre' && !$hasGenre) {
+				$totGenres += __testDatabaseGenreAlbumArtistPlaylist($tid, 'genre', @params2);
+			}
+			if ($call ne 'artist' && !$hasArtist) {
+				$totArtists += __testDatabaseGenreAlbumArtistPlaylist($tid, 'artist', @params2);
+			}
+			if ($call ne 'album' && !$hasAlbum) {
+				$totAlbums += __testDatabaseGenreAlbumArtistPlaylist($tid, 'album', @params2);
+			}
+			{
+				my %cliCall = cliTitles(undef, @params2);
+				my $count = $cliCall{'count'};
+				test_SubTest(	$tid, 
+								__callString('title', @params2) . ".count > 0",
+								$count > 0); 				
+				$totSongs += $count;			
+			}
+			
+		}
+	
+		# total
+		# we can't test for equality because of 2 server preferences:
+		# - include Composer/Band/etc in Artists => 1 song may have 2 artists
+		# - multi-tag support
+	
+		if ($call ne 'artist' && !$hasArtist) {
+			my %cliCall = cliGenresAlbumsArtistsPlaylists('artist', undef, @params);
+			test_SubTest(	$tid, 
+							"SUM " . __callString('artist', @params2) . ".count " .
+							"($totArtists) >= " . __callString('artist', @params) .
+							".count",
+							$totArtists >= $cliCall{'count'}); 				
+		}
+		if ($call ne 'genre' && !$hasGenre) {
+			my %cliCall = cliGenresAlbumsArtistsPlaylists('genre', undef, @params);
+			test_SubTest(	$tid, 
+							"SUM " . __callString('genre', @params2) . ".count " .
+							"($totGenres) >= " . __callString('genre', @params) .
+							".count",
+							$totGenres >= $cliCall{'count'}); 				
+		}
+		if ($call ne 'album' && !$hasAlbum) {
+			my %cliCall = cliGenresAlbumsArtistsPlaylists('album', undef, @params);
+			test_SubTest(	$tid, 
+							"SUM " . __callString('album', @params2) . ".count " .
+							"($totAlbums) >= " . __callString('album', @params) .
+							".count",
+							$totAlbums >= $cliCall{'count'}); 				
+		}
+		{
+			my %cliCall = cliTitles(undef, @params);
+			test_SubTest(	$tid, 
+							"SUM " . __callString('title', @params2) . ".count " .
+							"($totSongs) >= " . __callString('title', @params) .
+							".count",
+							$totSongs >= $cliCall{'count'}); 				
+		}
 
-	# total
-	# we can't test for equality because of 2 server preferences:
-	# - include Composer/Band/etc in Artists => 1 song may have 2 artists
-	# - multi-tag support
+	}
+	else {
+		# Digging down for playlists...
+		while ( my ($key, $value) = each(%DB) ) {
+			$gd_subtest && print("\nTesting \"playlisttracks PID:$value\"\n");
+			my %cliCall = cliPlaylisttracks($value);
+			my $num = $cliCall{'count'};
+			my %songDB;
+			test_SubTest(	$tid, 
+							"playlisttracks PID:$value.count > 0 ($num)",
+							$num>0); 				
+			for(my $i = 0; $i < $num; $i++) {
+				%cliCall = cliPlaylisttracks($value, $i);
+				$songDB{$cliCall{'id'}} = $cliCall{'id'};
+				my $TID = $cliCall{'id'};
+				
+				test_SubTest($tid, 
+							"Default gald tags are returned for TID:$TID",
+							defined $cliCall{'genre'} && defined $cliCall{'artist'} &&
+						    defined $cliCall{'album'} && defined $cliCall{'duration'});
+						    
+				# pick random tags...
+				my $tag;
+				foreach my $a ('a'..'z') {
+					$tag .= $a if (randomSmaller(2)>1);
+				}
+				
+				%cliCall = cliPlaylisttracks($value, $i, "tags:$tag");
+				
+				my $same = 1;
+						
+				# save %cliCall...
+				my %titleData = %cliCall;
+					
+				%cliCall = cliSonginfo("track_id:" . $TID, "tags:$tag");
+						
+				for my $eachfield (keys %cliCall) {
+					next if ($eachfield eq 'count');
+					# songinfo returns URL if used with track_id, skip if url not asked to playlisttracks
+					next if ($eachfield eq 'url' && ($tag !~ /u/));
+#					$same &&= ($cliCall{$eachfield} eq $titleData{$eachfield});
+				}
+				for my $eachfield (keys %titleData) {
+					next if ($eachfield eq 'count');
+					$same &&= ($cliCall{$eachfield} eq $titleData{$eachfield});
+				}
 
-	if ($call ne 'artist' && !$hasArtist) {
-		my %cliCall = cliGenresAlbumsArtists('artist', undef, @params);
-		test_SubTest(	$tid, 
-						"SUM " . __callString('artist', @params2) . ".count " .
-						"($totArtists) >= " . __callString('artist', @params) .
-						".count",
-						$totArtists >= $cliCall{'count'}); 				
-	}
-	if ($call ne 'genre' && !$hasGenre) {
-		my %cliCall = cliGenresAlbumsArtists('genre', undef, @params);
-		test_SubTest(	$tid, 
-						"SUM " . __callString('genre', @params2) . ".count " .
-						"($totGenres) >= " . __callString('genre', @params) .
-						".count",
-						$totGenres >= $cliCall{'count'}); 				
-	}
-	if ($call ne 'album' && !$hasAlbum) {
-		my %cliCall = cliGenresAlbumsArtists('album', undef, @params);
-		test_SubTest(	$tid, 
-						"SUM " . __callString('album', @params2) . ".count " .
-						"($totAlbums) >= " . __callString('album', @params) .
-						".count",
-						$totAlbums >= $cliCall{'count'}); 				
-	}
-	{
-		my %cliCall = cliTitles(undef, @params);
-		test_SubTest(	$tid, 
-						"SUM " . __callString('title', @params2) . ".count " .
-						"($totSongs) >= " . __callString('title', @params) .
-						".count",
-						$totSongs >= $cliCall{'count'}); 				
+				test_SubTest($tid, 
+					"songinfo TID == playlisttracks for TID:$TID TAG:$tag",
+					$same); 
+				
+			}
+
+			# Test we got them all
+			test_SubTest($tid, 
+						"Acquired $num (==playlisttracks PID.count) tracks",
+						$num == keys %songDB); 				
+		}
+
+		
 	}
 
 	return $num;
 }
+
 
 # ---------------------------------------------
 # testDatabaseTitles()
@@ -1595,7 +1688,7 @@ sub testDatabaseRescan {
 	
 	# pre-conditions
 	test_canConnect($tid);
-	test_canPlayers($tid, 0);
+	test_canDB($tid);
 	
 	if (test_canRun($tid)) {
 		
@@ -1615,6 +1708,9 @@ sub testDatabaseRescan {
 		my $totAlbums = cliQueryNum(undef, ['info', 'total', 'albums']);
 		my $totGenres = cliQueryNum(undef, ['info', 'total', 'genres']);
 		my $totSongs = cliQueryNum(undef, ['info', 'total', 'songs']);
+
+		my %cliCall = cliGenresAlbumsArtistsPlaylists('playlist');
+		my $totPlaylists = $cliCall{'count'};;
 		
 		# Do a wipecache again and compare totals.
 		$gd_subtest && print("\nTesting wipecache, check state is stable...\n");
@@ -1628,6 +1724,8 @@ sub testDatabaseRescan {
 		my $newArtists = cliQueryNum(undef, ['info', 'total', 'artists']);
 		my $newAlbums = cliQueryNum(undef, ['info', 'total', 'albums']);
 		my $newGenres = cliQueryNum(undef, ['info', 'total', 'genres']);
+		%cliCall = cliGenresAlbumsArtistsPlaylists('playlist');
+		my $newPlaylists = $cliCall{'count'};;
 		
 		test_SubTest(	$tid, "wipecache => no change in total songs (before: $totSongs, after: $newSongs)",
 						$totSongs == $newSongs);
@@ -1637,6 +1735,8 @@ sub testDatabaseRescan {
 						$totAlbums == $newAlbums);
 		test_SubTest(	$tid, "wipecache => no change in total genres (before: $totGenres, after: $newGenres)",
 						$totGenres == $newGenres);
+		test_SubTest(	$tid, "wipecache => no change in total playlists (before: $totPlaylists, after: $newPlaylists)",
+						$totPlaylists == $newPlaylists);
 
 		# Same for rescan...
 		$gd_subtest && print("\nTesting rescan, check state is stable...\n");
@@ -1649,16 +1749,53 @@ sub testDatabaseRescan {
 		$newArtists = cliQueryNum(undef, ['info', 'total', 'artists']);
 		$newAlbums = cliQueryNum(undef, ['info', 'total', 'albums']);
 		$newGenres = cliQueryNum(undef, ['info', 'total', 'genres']);
+		%cliCall = cliGenresAlbumsArtistsPlaylists('playlist');
+		$newPlaylists = $cliCall{'count'};;
 		
-		test_SubTest(	$tid, "wipecache => no change in total songs (before: $totSongs, after: $newSongs)",
+		test_SubTest(	$tid, "rescan => no change in total songs (before: $totSongs, after: $newSongs)",
 						$totSongs == $newSongs);
-		test_SubTest(	$tid, "wipecache => no change in total artists (before: $totArtists, after: $newArtists)",
+		test_SubTest(	$tid, "rescan => no change in total artists (before: $totArtists, after: $newArtists)",
 						$totArtists == $newArtists);
-		test_SubTest(	$tid, "wipecache => no change in total albums (before: $totAlbums, after: $newAlbums)",
+		test_SubTest(	$tid, "rescan => no change in total albums (before: $totAlbums, after: $newAlbums)",
 						$totAlbums == $newAlbums);
-		test_SubTest(	$tid, "wipecache => no change in total genres (before: $totGenres, after: $newGenres)",
+		test_SubTest(	$tid, "rescan => no change in total genres (before: $totGenres, after: $newGenres)",
 						$totGenres == $newGenres);
+		test_SubTest(	$tid, "rescan => no change in total playlists (before: $totPlaylists, after: $newPlaylists)",
+						$totPlaylists == $newPlaylists);
 		
+		# Just rescan the playlists...
+		# Do that only if there ARE playlists, otherwise it fails...
+		if ($newPlaylists > 4) {
+			$gd_subtest && print("\nTesting rescan playlists, check state is stable...\n");
+			cliCommand(undef, ['rescan', 'playlists']);
+			__testDatabaseRescanNotif($tid, 'rescan playlists');
+			__testDatabaseRescanWaitDone('rescan playlists');
+			$gd_subtest && print "rescan playlists complete\n";
+			
+	
+			$newSongs = cliQueryNum(undef, ['info', 'total', 'songs']);
+			$newArtists = cliQueryNum(undef, ['info', 'total', 'artists']);
+			$newAlbums = cliQueryNum(undef, ['info', 'total', 'albums']);
+			$newGenres = cliQueryNum(undef, ['info', 'total', 'genres']);
+			%cliCall = cliGenresAlbumsArtistsPlaylists('playlist');
+			$newPlaylists = $cliCall{'count'};;
+			
+			test_SubTest(	$tid, "rescan playlists => no change in total songs (before: $totSongs, after: $newSongs)",
+							$totSongs == $newSongs);
+			test_SubTest(	$tid, "rescan playlists => no change in total artists (before: $totArtists, after: $newArtists)",
+							$totArtists == $newArtists);
+			test_SubTest(	$tid, "rescan playlists => no change in total albums (before: $totAlbums, after: $newAlbums)",
+							$totAlbums == $newAlbums);
+			test_SubTest(	$tid, "rescan playlists => no change in total genres (before: $totGenres, after: $newGenres)",
+							$totGenres == $newGenres);
+			test_SubTest(	$tid, "rescan playlists => no change in total playlists (before: $totPlaylists, after: $newPlaylists)",
+							$totPlaylists == $newPlaylists);
+		}
+		else {
+			$gd_subtest && print "\n";
+			test_SubTest($tid, "rescan playlists", 'skip', "not enough playlists to test, need 5, found $newPlaylists");				
+		}
+
 		
 		# Test issuing wipecache while it is in progress..
 		$gd_subtest && print("\nTesting wipecache, issuing one while in progress...\n");
@@ -1677,25 +1814,29 @@ sub __testDatabaseRescanNotif {
 	my $tid = shift;
 	my $call = shift;
 	my %cliCall;
-	%cliCall = cliGenresAlbumsArtists('artist');
+	%cliCall = cliGenresAlbumsArtistsPlaylists('artist');
 	test_SubTest(	$tid, 
 					"$call => artists.rescan defined",
 					defined $cliCall{'rescan'});
-	%cliCall = cliGenresAlbumsArtists('album');
+	%cliCall = cliGenresAlbumsArtistsPlaylists('album');
 	test_SubTest(	$tid, 
 					"$call => albums.rescan defined",
 					defined $cliCall{'rescan'});
-	%cliCall = cliGenresAlbumsArtists('genre');
+	%cliCall = cliGenresAlbumsArtistsPlaylists('genre');
 	test_SubTest(	$tid, 
 					"$call => genres.rescan defined",
+					defined $cliCall{'rescan'});
+	%cliCall = cliGenresAlbumsArtistsPlaylists('playlist');
+	test_SubTest(	$tid, 
+					"$call => playlists.rescan defined",
+					defined $cliCall{'rescan'});
+	%cliCall = cliPlaylisttracks(0);
+	test_SubTest(	$tid, 
+					"$call => playlisttracks.rescan defined",
 					defined $cliCall{'rescan'});
 	%cliCall = cliTitles();
 	test_SubTest(	$tid, 
 					"$call => titles.rescan defined",
-					defined $cliCall{'rescan'});
-	%cliCall = cliPlaylists();
-	test_SubTest(	$tid, 
-					"$call => playlists.rescan defined",
 					defined $cliCall{'rescan'});
 	%cliCall = cliSonginfo();
 	test_SubTest(	$tid, 
@@ -1720,7 +1861,7 @@ sub __testDatabaseRescanWaitDone {
 	my $call = shift;	
 
 	until (!cliQueryFlag(undef, ['rescan'])) {
-		$gd_subtest && print "Waiting for $call to complete...\n";
+		$gd_subtest && print "Waiting for \'$call\' to complete...\n";
 		sleep 5;
 	}
 }
@@ -1730,6 +1871,19 @@ sub __testDatabaseRescanWaitDone {
 # ******************************************************************************
 # Subroutines (utility functions)
 # ******************************************************************************
+
+# ---------------------------------------------
+# restoreFlags
+# ---------------------------------------------
+sub restoreFlags {
+	$gd_sub && p_sub("restoreFlags()");
+	if ($gRestoreGroupDisc) {
+		print "\nRestoring database configuration...\n";
+		cliCommand(undef, ['pref', 'groupdiscs', 0]);
+		cliCommand(undef, ['wipecache']);
+		__testDatabaseRescanWaitDone('wipecache');
+	}
+}
 
 # ---------------------------------------------
 # test_New
@@ -1926,6 +2080,16 @@ sub test_canDB {
 				$gtest_db{$tid} = 1;
 				$gtest_dbcomment{$tid} = "not enough songs found, needed $needed";
 			}
+			
+			# we must have groupdiscs set to 1...
+			if (!cliQueryFlag(undef, ['pref', 'groupdiscs'])) {
+				$gd_subtest && print "Configuring database for tests...\n";
+				$gRestoreGroupDisc = 1;
+				cliCommand(undef, ['pref', 'groupdiscs', 1]);
+				cliCommand(undef, ['wipecache']);
+				__testDatabaseRescanWaitDone('wipecache');
+			}
+			
 		}
 		else {
 			# something's wrong if different from 1, i.e. skipped
@@ -2566,6 +2730,103 @@ sub cliPlayers {
 }
 
 # ---------------------------------------------
+# cliPlaylisttracks
+# ---------------------------------------------
+sub cliPlaylisttracks {
+	my $playlist = shift;
+	my $index = shift;
+	my @params = @_;
+	
+	$gd_sub && p_sub('cliPlaylisttracks(' . $playlist . (defined($index)?", $index)":")"));
+
+	my %cliFields = (
+		'rescan' 				=> 'flag', 
+		'count' 				=> 'num', 
+		'playlist index'		=> 'num',
+		'id'					=> 'num',
+		'title'					=> 'string',
+		'genre'					=> 'string',
+		'genre_id'				=> 'num',
+		'artist'				=> 'string',
+		'artist_id'				=> 'num',
+		'composer'				=> 'string',
+		'band'					=> 'string',
+		'conductor'				=> 'string',
+		'album'					=> 'string',
+		'album_id'				=> 'num',
+		'duration'				=> 'num',
+		'disc'					=> 'num',
+		'disccount'				=> 'num',
+		'tracknum'				=> 'num',
+		'year'					=> 'num',
+		'bpm'					=> 'num',
+		'comment'				=> 'string',
+		'type'					=> 'string',
+		'tagversion'			=> 'string',
+		'bitrate'				=> 'string',
+		'filesize'				=> 'string',
+		'drm'					=> 'string',
+		'coverart'				=> 'flag',
+		'modificationTime'		=> 'string',
+		'url'					=> 'string',
+	);
+
+	my $from;
+	my $to;
+	if (!defined $index) {
+		$index = -1;
+		$from = 0;
+		$to = -1;
+	}
+	else {
+		$from = randomSmaller($index);
+		$to = randomBigger($index, 10);
+	}
+	my $idx = -1;
+	my %result;
+	push @params, "playlist_id:$playlist";
+	my @results = cliExtCommand(undef, ["playlisttracks", $from, ($to - $from + 1), @params]);
+	
+	for(my $i = 3; $i < scalar(@results); $i++){	
+		if ($i < 3+scalar @params) {
+			# find the param at $params[$i-3
+			# al 0 2 p0 r0
+			# 0  1 2 3  4
+			if ($results[$i] ne $params[$i - 3]) {
+				syntaxReport("Non matching param \'${params[$i -3]}\'" , "not found");
+			}
+		}
+		elsif ($results[$i] =~ /([^:]+):(.*)/) {
+			my $curfield = $1;
+			my $curvalue = $2;
+			if (defined $cliFields{$curfield}) {
+				if ('playlist index' eq $curfield) {
+					$idx = $curvalue;
+					if ($idx > $index) {
+						return %result;
+					}
+				}
+				elsif ($idx == $index) {
+					if (checkType($curvalue, $cliFields{$curfield})) {
+						$result{$curfield} = $curvalue;
+					}
+					else {
+						syntaxReport('Type error for field playlisttracks.' . $curfield , $curvalue . " is not " . $cliFields{$curfield});
+					}
+				}
+			}
+			else {
+				syntaxReport("Unknown field $curfield for playlisttracks command", "value:$curvalue");
+			}
+		}
+		else {
+			syntaxReport('Can\'t parse:' . $results[$i], "playlisttracks command");
+		}
+	}
+	return %result;
+}
+
+# ---------------------------------------------
 # cliStatus
 # ---------------------------------------------
 sub cliStatus {
@@ -2730,18 +2991,18 @@ sub cliPlaylistcontrol {
 
 
 # ---------------------------------------------
-# cliGenresAlbumsArtists
+# cliGenresAlbumsArtistsPlaylists
 # ---------------------------------------------
-sub cliGenresAlbumsArtists {
+sub cliGenresAlbumsArtistsPlaylists {
 	my $call = shift;
 	my $index = shift;
 	my @params = @_;
 	
 	if (!defined $call) {
-		print "############################# cliGenresAlbumsArtists called without \$call !!!!! \n";
+		print "############################# cliGenresAlbumsArtistsPlaylists called without \$call !!!!! \n";
 	}
 
-	$gd_sub && p_sub("cliGenresAlbumsArtists($call)");
+	$gd_sub && p_sub("cliGenresAlbumsArtistsPlaylists($call)");
 
 	my %cliFields = (
 		'rescan' 				=> 'flag', 
@@ -2956,107 +3217,6 @@ sub cliTitles {
 		}
 		else {
 			syntaxReport('Can\'t parse:' . $results[$i], "titles command");
-		}
-	}
-	return %result;
-}
-
-# ---------------------------------------------
-# cliPlaylists
-# ---------------------------------------------
-sub cliPlaylists {
-	my $index = shift;
-	my @params = @_;
-
-	$gd_sub && p_sub('cliPlaylists(' . (defined($index)?", $index)":")"));
-
-	my %cliFields = (
-		'count' 				=> 'num', 
-		'rescan'				=> 'flag', 
-		'id'					=> 'num',
-		'title'					=> 'string',
-		'genre'					=> 'string',
-		'genre_id'				=> 'num',
-		'artist'				=> 'string',
-		'artist_id'				=> 'num',
-		'composer'				=> 'string',
-		'band'					=> 'string',
-		'conductor'				=> 'string',
-		'album'					=> 'string',
-		'album_id'				=> 'num',
-		'duration'				=> 'num',
-		'disc'					=> 'num',
-		'disccount'				=> 'num',
-		'tracknum'				=> 'num',
-		'year'					=> 'num',
-		'bpm'					=> 'num',
-		'comment'				=> 'string',
-		'type'					=> 'string',
-		'tagversion'			=> 'string',
-		'bitrate'				=> 'string',
-		'filesize'				=> 'string',
-		'drm'					=> 'string',
-		'coverart'				=> 'flag',
-		'modificationTime'		=> 'string',
-		'url'					=> 'string',
-	);
-
-	my $from;
-	my $to;
-	if (!defined $index) {
-		$index = -1;
-		$from = 0;
-		$to = -1;
-	}
-	else {
-		$from = randomSmaller($index);
-		$to = randomBigger($index, 10);
-	}
-	my $idx = -1;
-	my %result;
-	my $first = 1;
-	my @results = cliExtCommand(undef, ["playlists", $from, ($to - $from + 1), @params]);
-	
-	for(my $i = 3; $i < scalar(@results); $i++){	
-		if ($i < 3+scalar @params) {
-			# find the param at $params[$i-3
-			# al 0 2 p0 r0
-			# 0  1 2 3  4
-			if ($results[$i] ne $params[$i - 3]) {
-				syntaxReport("Non matching param \'${params[$i -3]}\'" , "not found");
-			}
-		}
-		elsif ($results[$i] =~ /([^:]+):(.*)/) {
-			my $curfield = $1;
-			my $curvalue = $2;
-			if (defined $cliFields{$curfield}) {
-				if ('id' eq $curfield) {
-					if ($first) {
-						$idx = $from;
-						$first = 0;
-					}
-					else {	
-						$idx++;
-					}
-					if ($idx > $index) {
-						return %result;
-					}
-				}
-				elsif ($idx == $index) {
-					if (checkType($curvalue, $cliFields{$curfield})) {
-						$result{$curfield} = $curvalue;
-					}
-					else {
-						syntaxReport('Type error for field playlists.' . $curfield , $curvalue . " is not " . $cliFields{$curfield});
-					}
-				}
-			}
-			else {
-				syntaxReport("Unknown field $curfield for playlists command", "value:$curvalue");
-			}
-		}
-		else {
-			syntaxReport('Can\'t parse:' . $results[$i], "playlists command");
 		}
 	}
 	return %result;
