@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 # ******************************************************************************
-# CLI Exerciser N' Tester                                                   v6.1
+# CLI Exerciser N' Tester                                                   v6.2
 #
 # Copyright (c) 2005 Frederic Thomas (fred(at)thomascorner.com)
 #
@@ -144,7 +144,7 @@ my $gRestoreGroupDisc;
 # Main program
 # ******************************************************************************
 
-print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.1\n\n";
+print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.2\n\n";
 			
 testConnectDisconnect();
 testGeneral();
