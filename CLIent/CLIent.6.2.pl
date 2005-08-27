@@ -32,7 +32,7 @@
 # - 
 #
 # Plattform tested:
-# - MacOS X 10.3.x
+# - MacOS X 10.4.x
 #
 # Known restrictions:
 # - Commands not tested: listen, ir
@@ -146,20 +146,22 @@ my $gRestoreGroupDisc;
 
 print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.2\n\n";
 			
-#testConnectDisconnect();
-#testGeneral();
-#testPlayersQueries();
-#testPlayersSleep();
-#testPlayersPower();
-#testPlayersMixer();
-#testPlayersDisplay();
-#testDatabaseRescan();
-#testDatabaseGenres();
-#testDatabaseAlbums();
+testConnectDisconnect();
+testGeneral();
+testPlayersQueries();
+testPlayersSleep();
+testPlayersPower();
+testPlayersMixer();
+testPlayersDisplay();
+testDatabaseRescan();
+testDatabaseGenres();
+testDatabaseAlbums();
 testDatabasePlaylists();
-#testDatabaseArtists();
-#testDatabaseTitles();
-#testDatabaseSonginfo();
+testDatabaseArtists();
+testDatabaseTitles();
+testDatabaseSonginfo();
+testPlaylistPlay();
+#testPlaylistInfoNavigation();
 
 test_PrintReport();
 
@@ -498,16 +500,16 @@ sub testPlayersPower {
 			my $playerid = $gplayers[$i];
 			my %cliCall = cliStatus($playerid);
 			test_SubTest(	$tid, 
-							"$playerid power ? == 0", 
+							"$playerid power 0 => $playerid power ? == 0", 
 							cliQueryFlag($playerid, ['power']) == 0);
 			test_SubTest(	$tid, 
-							"$playerid status.power == 0", 
+							"$playerid power 0 => $playerid status.power == 0", 
 							$cliCall{'power'} == 0);
 			test_SubTest(	$tid, 
-							"$playerid status.mode <undefined>", 
+							"$playerid power 0 => $playerid status.mode <undefined>", 
 							!defined $cliCall{'mode'});
 			test_SubTest(	$tid, 
-							"$playerid status.playlist_tracks <undefined>", 
+							"$playerid power 0 => $playerid status.playlist_tracks <undefined>", 
 							!defined $cliCall{'playlist_tracks'});							
 		}
 		
@@ -524,16 +526,16 @@ sub testPlayersPower {
 			my $playerid = $gplayers[$i];
 			my %cliCall = cliStatus($playerid);
 			test_SubTest(	$tid, 
-							"$playerid power ? == 1", 
+							"$playerid power 1 => $playerid power ? == 1", 
 							cliQueryFlag($playerid, ['power']) == 1);
 			test_SubTest(	$tid, 
-							"$playerid status.power == 1", 
+							"$playerid power 1 => $playerid status.power == 1", 
 							$cliCall{'power'} == 1);
 			test_SubTest(	$tid, 
-							"$playerid status.mode <defined>", 
+							"$playerid power 1 => $playerid status.mode <defined>", 
 							defined $cliCall{'mode'});
 			test_SubTest(	$tid, 
-							"$playerid status.playlist_tracks <defined>", 
+							"$playerid power 1 => $playerid status.playlist_tracks <defined>", 
 							defined $cliCall{'playlist_tracks'});							
 		}
 		
@@ -544,7 +546,7 @@ sub testPlayersPower {
 		for (my $i=0; $i<scalar @gplayers; $i++) {
 			my $playerid = $gplayers[$i];
 			test_SubTest(	$tid, 
-							"$playerid power ? == 0", 
+							"$playerid power => $playerid power ? == 0", 
 							cliQueryFlag($playerid, ['power']) == 0);
 		}			
 	}
@@ -1096,46 +1098,60 @@ sub __testDatabaseGenreAlbumArtist {
 	# Perform search
 	my %DBsearch;
 	my $searchparam;
+	my $skip = 0;
 	while (!defined $searchparam) {
 		for my $key ( keys %DB ) {
 			if (randomSmaller(5) == 4 && !($key =~ /\*/)) {
 				$searchparam = $key;
+				
+				if ($searchparam eq 'No Genre') {
+					# Can't search for that, it fails...
+					if (scalar keys %DB == 1) {
+						$skip = 1;
+					}
+					else {
+						$searchparam = undef;
+					}
+				}
+
 				last;
 			}
 		}
 	}
-	my @paramsearch = @params;
-	if (randomSmaller(2) == 1) {
-		unshift @paramsearch, "search:$searchparam";
-	}
-	else {
-		push @paramsearch, "search:$searchparam";
-	}
-	%cliCall = cliGenresAlbumsArtistsPlaylists($call, undef, @paramsearch);
-	my $numsearch = $cliCall{'count'};
-
-	for(my $i = 0; $i < $numsearch; $i++) {
-		%cliCall = cliGenresAlbumsArtistsPlaylists($call, $i, @paramsearch);
-		$DBsearch{$cliCall{$call}} = $cliCall{'id'};
-	}
-
-	# Test results
-	# Found less than the whole
-	test_SubTest($tid, 
-				__callString($call, @paramsearch) . ".count <= " . __callString($call, @params) . ".count",
-				$numsearch <= keys %DB); 				
-	
-	# And found my key
-	# Don't want to re-implement here all SlimServer pattern matching!
-	my $found = 0;
-	for my $key ( keys %DBsearch ) {
-		if ($key eq $searchparam) {
-			$found = 1;
+	if (!$skip) {
+		my @paramsearch = @params;
+		if (randomSmaller(2) == 1) {
+			unshift @paramsearch, "search:$searchparam";
 		}
+		else {
+			push @paramsearch, "search:$searchparam";
+		}
+		%cliCall = cliGenresAlbumsArtistsPlaylists($call, undef, @paramsearch);
+		my $numsearch = $cliCall{'count'};
+	
+		for(my $i = 0; $i < $numsearch; $i++) {
+			%cliCall = cliGenresAlbumsArtistsPlaylists($call, $i, @paramsearch);
+			$DBsearch{$cliCall{$call}} = $cliCall{'id'};
+		}
+	
+		# Test results
+		# Found less than the whole
+		test_SubTest($tid, 
+					__callString($call, @paramsearch) . ".count <= " . __callString($call, @params) . ".count",
+					$numsearch <= keys %DB); 				
+		
+		# And found my key
+		# Don't want to re-implement here all SlimServer pattern matching!
+		my $found = 0;
+		for my $key ( keys %DBsearch ) {
+			if ($key eq $searchparam) {
+				$found = 1;
+			}
+		}
+		test_SubTest($tid, 
+					__callString($call, @paramsearch) . " \'$searchparam\' returns \'$searchparam\'",
+					$found); 
 	}
-	test_SubTest($tid, 
-				__callString($call, @paramsearch) . " \'$searchparam\' returns \'$searchparam\'",
-				$found); 
 
 	# Now test cross-references!
 	my $totGenres = 0;
@@ -1939,6 +1955,529 @@ sub __testDatabaseRescanWaitDone {
 }
 
 
+# ---------------------------------------------
+# testPlaylistPlay
+# ---------------------------------------------
+sub testPlaylistPlay {
+	$gd_sub && p_sub("testPlaylistPlay()");
+
+	#define test
+	my $tid = test_New("Playlist play modes");
+	
+	#pre-conditions
+	test_canConnect($tid);
+	test_canPlayers($tid);
+	test_canDB($tid, 10);
+	
+	if (test_canRun($tid)) {
+	
+		__testDatabaseDumpDB($tid);
+		
+		# Set all players to on, no sync, no playlist, no shuffle, no repeat
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['sync', '-']);
+			cliCommand($player, ['power', 1]);
+			cliCommand($player, ['playlist', 'clear']);
+			cliCommand($player, ['playlist', 'shuffle', 0]);
+			cliCommand($player, ['playlist', 'repeat', 0]);	
+		}
+		
+		my %cliSong1 = __testPlaylistPlayRandomSong();
+		my $song1Duration = $cliSong1{'duration'};
+		if (! %cliSong1) {
+			test_SubTest($tid, "play tests", 'skip', "could not find a MP3 song greater than 60 seconds in database");							
+		}
+		
+		my %cliSong2 = __testPlaylistPlayRandomSong();
+		my $song2Duration = $cliSong2{'duration'};
+		if (! %cliSong2) {
+			test_SubTest($tid, "play tests", 'skip', "could not find a MP3 song greater than 60 seconds in database");							
+		}
+		
+		
+		$gd_subtest && print "Testing play...\n";
+		
+		foreach my $player (@gplayers) {
+			# Use add and not load, as load starts playing
+			my $TID = $cliSong1{'id'};
+			my %cliCall = cliPlaylistcontrol($player, 'cmd:add', "track_id:$TID");
+			$TID = $cliSong2{'id'};
+			%cliCall = cliPlaylistcontrol($player, 'cmd:add', "track_id:$TID");
+			cliCommand($player, ['stop']); # to be sure...
+			$gd_subtest && print "Playlist added\n";
+		}
+
+
+		$gd_subtest && print "STOPPED\n";
+		__testPlaylistPlayCheck($tid, 0, 'stop', 1, $song1Duration);
+
+#ID play
+		$gd_subtest && print "STOP->PLAYING\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['play']);
+		}
+
+		__testPlaylistPlayCheck($tid, 0, 'play', 1, $song1Duration);
+
+		sleep 10;
+
+		$gd_subtest && print "PLAYING for 10 seconds\n";
+		# Allow 2 seconds for stream start up & plumbing delays...
+		my $time = __testPlaylistPlayCheck($tid, 8, 'play');
+		
+#ID pause
+		$gd_subtest && print "PLAYING->PAUSED\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['pause']);
+		}
+
+		$time = __testPlaylistPlayCheck($tid, $time, 'pause');
+
+		$gd_subtest && print "PAUSED for 5 seconds\n";
+		sleep 5;
+		$time = __testPlaylistPlayCheck($tid, $time, 'pause');
+
+
+#ID pause 0
+		$gd_subtest && print "PAUSED->PLAYING for 10 second\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['pause', '0']);
+		}
+		sleep 10;
+		$time = __testPlaylistPlayCheck($tid, $time+10, 'play');
+
+				
+#ID pause 1
+		$gd_subtest && print "PLAYING->PAUSED\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['pause', '1']);
+		}
+		$time = __testPlaylistPlayCheck($tid, $time, 'pause');
+		sleep 1; # just for display...
+
+#ID mode play
+		$gd_subtest && print "PAUSED->PLAYING for 5 second\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['mode', 'play']);
+		}		
+		sleep 5;
+		$time = __testPlaylistPlayCheck($tid, $time+5, 'play');
+
+#ID mode pause
+		$gd_subtest && print "PLAYING->PAUSED\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['mode', 'pause']);
+		}		
+		$time = __testPlaylistPlayCheck($tid, $time, 'pause');
+		sleep 1; # just for display...
+
+#ID mode stop
+		$gd_subtest && print "PAUSED->STOPPED\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['mode', 'stop']);
+		}		
+		__testPlaylistPlayCheck($tid, 0, 'stop');
+		sleep 1; # just for display...
+
+#ID mode play
+		$gd_subtest && print "STOPPED->PLAYING for 10 second\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['mode', 'play']);
+		}		
+		sleep 10;
+		# Again allow 2 secs for plumbing
+		$time = __testPlaylistPlayCheck($tid, 8, 'play');
+
+#ID stop
+		$gd_subtest && print "PLAYING->STOPPED\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['stop']);
+		}
+		__testPlaylistPlayCheck($tid, 0, 'stop');
+
+
+#ID time +T
+		$gd_subtest && print "PLAYING\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['mode', 'play']);
+		}
+		sleep 5;
+		my $skip = randomBigger(30, $cliSong1{'duration'}/2);
+		$gd_subtest && print "TIME +$skip\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['time', "+$skip"]);
+		}
+		$time = __testPlaylistPlayCheck($tid, $skip + 3);
+		sleep 5;
+		
+#ID time -T
+		$skip = randomSmaller($time/2);
+		$gd_subtest && print "TIME -$skip\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['time', "-$skip"]);
+		}
+		__testPlaylistPlayCheck($tid, $time - $skip + 4);
+		sleep 5;
+
+#ID time T
+		$skip = ceil($cliSong1{'duration'} - 10);
+		$gd_subtest && print "TIME $skip\n";
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['time', "$skip"]);
+		}
+		__testPlaylistPlayCheck($tid, $skip);
+
+		$gd_subtest && print "SONG TRANSITION\n";
+		my $wait_transition = 1;
+# Song transition...
+		while ($wait_transition) {
+			foreach my $player (@gplayers) {
+				# only use status since the other guys are not atomic...
+				my %cliCall = cliStatus($player);
+				my $time = $cliCall{'time'};
+				my $mode = $cliCall{'mode'};
+				my $index = $cliCall{'playlist_cur_index'};
+				my $duration = $cliCall{'duration'};
+
+				if ($index == 0) {
+					test_SubTest(	$tid, 
+						"$player duration ? == song duration ($song1Duration)",
+						$duration == $song1Duration);
+					test_SubTest(	$tid, 
+						"$player time ? > 0",
+						$time > 0);
+				}
+				else {
+					$gd_subtest && print "Transition done...\n";
+					
+					test_SubTest(	$tid, 
+						"$player duration ? == song duration ($song2Duration)",
+						$duration == $song2Duration);
+					test_SubTest(	$tid, 
+						"$player time ? == 0",
+						$time == 0);
+						
+					if (!($time == 0 && $duration == $song2Duration)) {
+						++$wait_transition;
+						if ($wait_transition > 100) {
+							test_SubTest($tid, "song transition failed", 0);
+							$wait_transition = 0;
+						}
+					}
+					else {
+						$wait_transition = 0;
+					}
+				}
+			}
+		}
+#ID rate ABS
+	}
+}
+
+
+sub __testPlaylistPlayRandomSong {
+	# Select a random song...
+	my %cliSong;
+	my $TID;
+	
+	while (!defined $TID) {
+		while ( my ($key, $value) = each(%gDBtitles) ) {
+			if (randomSmaller(50) > 48 && !($value =~ /\*/)) {
+				# test it is long enough...
+				%cliSong = cliSonginfo("track_id:" . $key, "tags:dox");
+				# Only MP3 to make sure it can play on all players with no
+				# dependency on lame or whatever...
+				if ($cliSong{'duration'} > 60 && $cliSong{'type'} eq 'MP3') {
+					$TID = $key;
+					last;
+				}
+			}
+		}
+	}
+	return %cliSong;
+}
+
+sub __testPlaylistPlayCheck {
+	my $tid = shift;
+	my $musttime = shift;
+	my $mustmode = shift;
+	my $mustrate = shift;
+	my $mustduration = shift;
+	my $time;
+
+	foreach my $player (@gplayers) {
+		my %cliCall = cliStatus($player);
+		$time = cliQueryNum($player, ['time']);
+		
+		
+		if (defined $musttime) {
+			my $statustime = $cliCall{'time'};
+			test_SubTest(	$tid, 
+				"$player status.time ($statustime) == $musttime +/- 1",
+				__PlaylistPlayCheckTimeCompare($statustime, $musttime, 2));
+				
+			test_SubTest(	$tid, 
+				"$player time ? ($time) == $musttime +/- 1",
+				__PlaylistPlayCheckTimeCompare($time, $musttime, 2));
+		}
+		
+		if (defined $mustmode) {
+			test_SubTest(	$tid, 
+				"$player status.mode == $mustmode",
+				$cliCall{'mode'} eq $mustmode);
+				
+			test_SubTest(	$tid, 
+				"$player mode ? == $mustmode",
+				cliQuery($player, ['mode']) eq $mustmode);
+		}
+		
+		if (defined $mustduration) {
+			test_SubTest(	$tid, 
+				"$player status.duration == $mustduration",
+				$cliCall{'duration'} == $mustduration);
+				
+			test_SubTest(	$tid, 
+				"$player duration ? == $mustduration",
+				cliQueryNum($player, ['duration']) == $mustduration);
+		}
+
+		if (defined $mustrate) {
+			test_SubTest(	$tid, 
+				"$player status.rate == $mustrate",
+				$cliCall{'rate'} == $mustrate);
+				
+			test_SubTest(	$tid, 
+				"$player rate ? == $mustrate",
+				cliQueryNum($player, ['rate']) == $mustrate);
+		}
+	}		
+	return $time;	
+}
+
+sub __PlaylistPlayCheckTimeCompare {
+	my $is = shift;
+	my $shall = shift;
+	my $jitter = shift;
+	
+	return 1 if ($is == $shall);
+	return 1 if ($is < $shall + $jitter && $is > $shall - $jitter);
+	return 0;
+}
+
+# ---------------------------------------------
+# testPlaylistInfoNavigation
+# ---------------------------------------------
+sub testPlaylistInfoNavigation {
+	$gd_sub && p_sub("testPlaylistInfoNavigation()");
+
+	#define test
+	my $tid = test_New("Playlist info queries & navigation");
+	
+	#pre-conditions
+	test_canConnect($tid);
+	test_canPlayers($tid);
+	test_canDB($tid, 10);
+	
+	if (test_canRun($tid)) {
+	
+		__testDatabaseDumpDB($tid);
+	
+		# Set all players to on, no sync, no playlist, no shuffle, no repeat
+		my %memory;
+		foreach my $player (@gplayers) {
+			cliCommand($player, ['sync', '-']);
+			cliCommand($player, ['power', 1]);
+			cliCommand($player, ['playlist', 'clear']);
+			cliCommand($player, ['playlist', 'shuffle', 0]);
+			cliCommand($player, ['playlist', 'repeat', 0]);	
+		}
+		
+		# Create an internal playlist of 10 random songs...
+		my @playlist;
+		my %index_gDBOpt; # keys: TID, value: field.
+#		my %keys;
+#		$keys{'count'}=0;
+#		while ($keys{'count'} < 10) {
+#			while ( my ($key, $value) = each(%gDBtitles) ) {
+#				if (randomSmaller(50) > 48 && !($value =~ /\*/) && !defined($keys{$value})) {
+#					push @playlist, $key;
+#					$keys{$value} = 1;
+#					$keys{'count'}++;
+#					last;
+#				}
+#			}
+#		}
+
+		# Create a playlist with our special songs that have a given tag...
+		my $drmTID;
+		while ( my ($field, $opt) = each(%gsonginfoFields) ) {
+			if ($opt eq 'zz') {
+				next;
+			}
+			my $TID = $gDBopt{$field};
+			if (!defined $TID) {
+				test_SubTest($tid, "status TAG:" .
+									$gsonginfoFields{$field} . 
+									"-$field", 'skip', 
+									"none found in DB");				
+			}
+			else {
+				if ($field eq 'drm') {
+					# Can't play those, add to the end if found
+					$drmTID = $TID;
+				}
+				else {
+					push @playlist, $TID;
+					$index_gDBOpt{$TID} = $field;
+				}
+			}
+		}
+		if (defined $drmTID) {
+			push @playlist, $drmTID;
+			$index_gDBOpt{$drmTID} = 'drm';
+		}
+		
+		
+		# Because at least title is always present, we know @playlist is not empty.
+
+
+		# Configure each player with playlist...
+		foreach my $player (@gplayers) {
+			foreach my $song (@playlist) {
+				my %cliCall = cliPlaylistcontrol($player, 'cmd:add', "track_id:$song");
+			}
+			cliCommand($player, ['play']);
+		}		
+
+		# Now test the whole thing, song by song
+		my $correctcount = scalar @playlist;
+		
+		
+		for (my $i=0; $i < ($correctcount - defined $drmTID); ++$i) {
+			foreach my $player (@gplayers) {
+				my $count = cliQueryNum($player, ['playlist', 'tracks']);
+				my $index = cliQueryNum($player, ['playlist', 'index']);
+				my %cliCall = cliStatus($player);
+				my $statusindex = $cliCall{'playlist_cur_index'};
+				my $statuscount = $cliCall{'playlist_tracks'};
+				
+				$gd_subtest && print("\nTesting while playing song $i...\n");
+				
+				test_SubTest($tid,
+							 "$player playlist tracks ? ($count) == number of songs ($correctcount)",
+							 $count == $correctcount);
+				test_SubTest($tid,
+							 "$player playlist index ? ($index) == current song ($i)",
+							 $index == $i);				 
+				test_SubTest($tid,
+							 "$player status.playlist_tracks ($statuscount) == number of songs ($correctcount)",
+							  $statuscount == $correctcount);
+				test_SubTest($tid,
+							 "$player status.playlist_cur_index ($statusindex) == current song ($i)",
+							  $statusindex == $i);
+							
+				__testPlaylistInfoNavigationField($tid, $player, 'genre', $i);
+				__testPlaylistInfoNavigationField($tid, $player, 'artist', $i);
+				__testPlaylistInfoNavigationField($tid, $player, 'album', $i);
+				__testPlaylistInfoNavigationField($tid, $player, 'title', $i);
+				__testPlaylistInfoNavigationField($tid, $player, 'duration', $i);
+				__testPlaylistInfoNavigationField($tid, $player, 'path', $i);
+				
+	
+				
+				
+				if (!(defined $drmTID && $i == ($correctcount - defined $drmTID - 1))) {
+					cliCommand($player, ['playlist', 'index', $i+1]);
+					sleep 0.5;
+				}		
+			}	
+		}
+		
+#		if (defined $drmTID) {
+#			sleep 5;
+#			foreach my $player (@gplayers) {
+#				test_SubTest($tid,
+#							 "DRM song stopped player...",
+#							  cliQueryNum($player, ['mode', 'mode']) eq 'stop');				
+#			}
+#		}
+
+#ID genre ?
+#ID playlist genre N ?
+#ID status.N.genre
+
+#ID artist ?
+#ID playlist artist N ?
+#ID status.N.artist
+
+#ID album ?
+#ID playlist album N ?
+#ID status.N.album
+
+#ID title ?
+#ID playlist title N ?
+#ID status.N.title
+
+#ID duration ?
+#ID playlist duration N ?
+#ID status.N.duration
+
+#ID path ?
+#ID playlist path N ?
+#ID status.N.url
+
+#ID status.N.id
+
+#ID playlist index N
+#ID playlist index +N
+#ID playlist index -N
+
+#ID status.N.album_id
+#ID status.N.artist_id
+#ID status.N.band
+#ID status.N.bitrate
+#ID status.N.bpm
+#ID status.N.comment
+#ID status.N.composer
+#ID status.N.conductor
+#ID status.N.coverart
+#ID status.N.coverThumb
+#ID status.N.disc
+#ID status.N.disccount
+#ID status.N.drm
+#ID status.N.filesize
+#ID status.N.genre_id
+#ID status.N.modificationTime
+#ID status.N.tagversion
+#ID status.N.tracknum
+#ID status.N.type
+#ID status.N.year
+		
+	}
+
+}
+
+
+sub __testPlaylistInfoNavigationField {
+	my $tid = shift;
+	my $player = shift;
+	my $field = shift;
+	my $index = shift;
+	my $statusfield = $field;
+	
+	my $curValue = cliQuery($player, [$field]);
+	my $idxValue = cliQuery($player, ['playlist', $field, $index]);
+	my %cliCall = cliStatus($player, $index, "tags:galdu");
+	$statusfield = 'url' if $field eq 'path';
+	my $statusValue = $cliCall{$statusfield};
+	
+	test_SubTest($tid,
+				 "$player $field ? ($curValue) == $player playlist $field $index ? ($idxValue)",
+				  $curValue eq $idxValue);	
+	test_SubTest($tid,
+				 "$player $field ? ($curValue) == $player status.$index.$statusfield ($statusValue)",
+				  $curValue eq $statusValue);
+}
 
 # ******************************************************************************
 # Subroutines (utility functions)
@@ -3236,7 +3775,7 @@ sub cliTitles {
 			$index = -1;
 		}
 		$from = randomSmaller($index);
-		$to = randomBigger($index, 30);
+		$to = randomBigger($index, 50);
 		$gcliTitles_cachedFrom = $from;
 		$gcliTitles_cachedTo = $to;
 		
