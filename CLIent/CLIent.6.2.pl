@@ -154,14 +154,14 @@ testPlayersPower();
 testPlayersMixer();
 testPlayersDisplay();
 testDatabaseRescan();
-testDatabaseGenres();
-testDatabaseAlbums();
-testDatabasePlaylists();
-testDatabaseArtists();
-testDatabaseTitles();
-testDatabaseSonginfo();
+#testDatabaseGenres();
+#testDatabaseAlbums();
+#testDatabasePlaylists();
+#testDatabaseArtists();
+#testDatabaseTitles();
+#testDatabaseSonginfo();
 testPlaylistPlay();
-#testPlaylistInfoNavigation();
+testPlaylistInfoNavigation();
 
 test_PrintReport();
 
@@ -343,7 +343,7 @@ sub testPlayersSleep {
 		# Part 1: a player set to sleep (a) fades the volume before sleeping
 		# and (b) powers off.
 		
-		my $sleeptime = 30 + randomSmaller(30);
+		my $sleeptime = 60 + randomSmaller(30);
 		
 		# Set all players to sleep
 		for (my $i=0; $i<scalar @gplayers; $i++) {
@@ -2863,6 +2863,8 @@ sub tcpSendReceive
 	$gd_tcp && p_tcp($string);
 	
 	print $gsocket "$string";
+
+	$/ = $gterm;
 
 	my $answer = <$gsocket>;
 
