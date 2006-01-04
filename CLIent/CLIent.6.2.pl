@@ -51,7 +51,6 @@ use strict;
 use warnings;
 use diagnostics;
 
-#use Getopt::Long;
 use IO::Socket;
 use IO::Socket qw(:DEFAULT :crlf);
 use URI::Escape;
@@ -147,21 +146,21 @@ my $gRestoreGroupDisc;
 print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.2\n\n";
 			
 testConnectDisconnect();
-testGeneral();
-testPlayersQueries();
-testPlayersSleep();
-testPlayersPower();
-testPlayersMixer();
-testPlayersDisplay();
-testDatabaseRescan();
-#testDatabaseGenres();
-#testDatabaseAlbums();
-#testDatabasePlaylists();
-#testDatabaseArtists();
-#testDatabaseTitles();
-#testDatabaseSonginfo();
-testPlaylistPlay();
-testPlaylistInfoNavigation();
+#testGeneral();
+#testPlayersQueries();
+#testPlayersSleep();
+#testPlayersPower();
+#testPlayersMixer();
+#testPlayersDisplay();
+#testDatabaseRescan();
+testDatabaseGenres();
+testDatabaseAlbums();
+testDatabasePlaylists();
+testDatabaseArtists();
+testDatabaseTitles();
+testDatabaseSonginfo();
+#testPlaylistPlay();
+#testPlaylistInfoNavigation();
 
 test_PrintReport();
 
