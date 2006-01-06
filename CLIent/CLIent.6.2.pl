@@ -145,7 +145,7 @@ my $gRestoreGroupDisc;
 
 print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.2\n\n";
 			
-testConnectDisconnect();
+#testConnectDisconnect();
 #testGeneral();
 #testPlayersQueries();
 #testPlayersSleep();
@@ -153,14 +153,14 @@ testConnectDisconnect();
 #testPlayersMixer();
 #testPlayersDisplay();
 #testDatabaseRescan();
-testDatabaseGenres();
-testDatabaseAlbums();
-testDatabasePlaylists();
-testDatabaseArtists();
-testDatabaseTitles();
-testDatabaseSonginfo();
+#testDatabaseGenres();
+#testDatabaseAlbums();
+#testDatabasePlaylists();
+#testDatabaseArtists();
+#testDatabaseTitles();
+#testDatabaseSonginfo();
 #testPlaylistPlay();
-#testPlaylistInfoNavigation();
+testPlaylistInfoNavigation();
 
 test_PrintReport();
 
@@ -1349,8 +1349,8 @@ sub testDatabasePlaylists {
 							$num>0); 				
 			for(my $i = 0; $i < $num; $i++) {
 				%cliCall = cliPlaylisttracks($value, $i);
-				$songDB{$cliCall{'id'}} = $cliCall{'id'};
 				my $TID = $cliCall{'id'};
+				$songDB{$TID} = $TID;
 				
 				test_SubTest($tid, 
 							"Default gald tags are returned for TID:$TID",
