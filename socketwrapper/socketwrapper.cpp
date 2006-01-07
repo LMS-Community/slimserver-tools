@@ -183,10 +183,14 @@ DWORD main(int argc, char **argv)
 			return -1;
 		}
 
-		if (!DuplicateHandle(GetCurrentProcess(), (HANDLE)outputSocket,
-						     GetCurrentProcess(), &outputSocketDup, 0,
-							 TRUE, DUPLICATE_SAME_ACCESS)) {
-			fprintf(stderr, "SW: Error duplicating output handle: %d\n", GetLastError());
+		WSAPROTOCOL_INFO pi;
+		if( WSADuplicateSocket( outputSocket, GetCurrentProcessId(), &pi ) ) {
+			fprintf(stderr, "SW: Error duplicating output socket: %d\n", GetLastError());
+			return -1;
+		}
+		outputSocketDup = (HANDLE)WSASocket( FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &pi, 0, 0 );
+		if (outputSocketDup == (HANDLE)INVALID_SOCKET) {
+			fprintf(stderr, "SW: Error opening duplicate output socket: %d\n", WSAGetLastError());
 			return -1;
 		}
 	}
