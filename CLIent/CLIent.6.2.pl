@@ -145,21 +145,21 @@ my $gRestoreGroupDisc;
 
 print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.2\n\n";
 			
-#testConnectDisconnect();
-#testGeneral();
-#testPlayersQueries();
-#testPlayersSleep();
-#testPlayersPower();
-#testPlayersMixer();
-#testPlayersDisplay();
-#testDatabaseRescan();
-#testDatabaseGenres();
-#testDatabaseAlbums();
-#testDatabasePlaylists();
-#testDatabaseArtists();
-#testDatabaseTitles();
-#testDatabaseSonginfo();
-#testPlaylistPlay();
+testConnectDisconnect();
+testGeneral();
+testPlayersQueries();
+testPlayersSleep();
+testPlayersPower();
+testPlayersMixer();
+testPlayersDisplay();
+testDatabaseRescan();
+testDatabaseGenres();
+testDatabaseAlbums();
+testDatabasePlaylists();
+testDatabaseArtists();
+testDatabaseTitles();
+testDatabaseSonginfo();
+testPlaylistPlay();
 testPlaylistInfoNavigation();
 
 test_PrintReport();
@@ -725,12 +725,34 @@ sub testPlayersMixer {
 			cliCommand($playerid, ['mixer', 'muting']);
 			sleep 1; # mutes includes a fade!
 			test_SubTest(	$tid, 
+							"$playerid mixer muting ?  == 1", 
+							cliQueryFlag($playerid, ['mixer', 'muting']) == 1);
+			test_SubTest(	$tid, 
 							"$playerid mixer muting => negative volume", 
 							cliQueryNum($playerid, ['mixer', 'volume']) == -50);
 			cliCommand($playerid, ['mixer', 'muting']);
 			sleep 1;
 			test_SubTest(	$tid, 
+							"$playerid mixer muting ?  == 0", 
+							cliQueryFlag($playerid, ['mixer', 'muting']) == 0);
+			test_SubTest(	$tid, 
 							"$playerid mixer muting => restored volume", 
+							cliQueryNum($playerid, ['mixer', 'volume']) == 50);
+			cliCommand($playerid, ['mixer', 'muting', 1]);
+			sleep 1; # mutes includes a fade!
+			test_SubTest(	$tid, 
+							"$playerid mixer muting ?  == 1", 
+							cliQueryFlag($playerid, ['mixer', 'muting']) == 1);
+			test_SubTest(	$tid, 
+							"$playerid mixer muting 1 => negative volume", 
+							cliQueryNum($playerid, ['mixer', 'volume']) == -50);
+			cliCommand($playerid, ['mixer', 'muting', 0]);
+			sleep 1;
+			test_SubTest(	$tid, 
+							"$playerid mixer muting ?  == 0", 
+							cliQueryFlag($playerid, ['mixer', 'muting']) == 0);
+			test_SubTest(	$tid, 
+							"$playerid mixer muting 0 => restored volume", 
 							cliQueryNum($playerid, ['mixer', 'volume']) == 50);
 			cliCommand($playerid, ['mixer', 'volume', $vol]);
 			
