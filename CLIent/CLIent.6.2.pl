@@ -145,22 +145,22 @@ my $gRestoreGroupDisc;
 
 print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.2\n\n";
 			
-testConnectDisconnect();
-testGeneral();
-testPlayersQueries();
-testPlayersSleep();
-testPlayersPower();
-testPlayersMixer();
-testPlayersDisplay();
-testDatabaseRescan();
-testDatabaseGenres();
+#testConnectDisconnect();
+#testGeneral();
+#testPlayersQueries();
+#testPlayersSleep();
+#testPlayersPower();
+#testPlayersMixer();
+#testPlayersDisplay();
+#testDatabaseRescan();
+#testDatabaseGenres();
 testDatabaseAlbums();
-testDatabasePlaylists();
-testDatabaseArtists();
-testDatabaseTitles();
-testDatabaseSonginfo();
-testPlaylistPlay();
-testPlaylistInfoNavigation();
+#testDatabasePlaylists();
+#testDatabaseArtists();
+#testDatabaseTitles();
+#testDatabaseSonginfo();
+#testPlaylistPlay();
+#testPlaylistInfoNavigation();
 
 test_PrintReport();
 
@@ -2977,7 +2977,7 @@ sub cliSendReceive
 	$printoutput = join("<>", @$paramsRef);
 	
 	foreach my $param (@paramsOutput) {
-		$param = uri_escape($param);
+		$param = uri_escape(Encode::encode_utf8($param));
 	}
 
 	$output = join(" ", @paramsOutput);
@@ -3477,6 +3477,7 @@ sub cliStatus {
 		'power' 				=> 'flag', 
 		'signalstrength'		=> 'num', 
 		'mode' 					=> 'string', 
+		'current_title'			=> 'string',
 		'rate' 					=> 'num',
 		'time' 					=> 'num', 
 		'duration'		 		=> 'num', 
