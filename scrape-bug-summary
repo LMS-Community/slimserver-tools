@@ -33,7 +33,7 @@ sub main {
 
 		for my $line (split /\n/, $content) {
 
-			if ($line =~ m|Bugzilla Bug $bug: (.+?)</div>$|) {
+			if ($line =~ m|Bug $bug: (.+?)</div>$|) {
 
 				$summary = $1;
 				last;
@@ -47,7 +47,7 @@ sub main {
 		printf(OUTTEXT "\t#%.4d - %s\n\n", $bug, decode_entities($summary));
 
 		# <li><a href="http://bugs.slimdevices.com/show_bug.cgi?id=121">#121</a> - 
-		printf(OUTHTML "\t\t\t<li><a href=\"%s\">#%.4d</a> - %s\n", sprintf($url, $bug), $bug, $summary);
+		printf(OUTHTML "\t\t<li><a href=\"%s\">#%.4d</a> - %s</li>\n", sprintf($url, $bug), $bug, $summary);
 	}
 
 	close FH;
