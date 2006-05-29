@@ -1,9 +1,9 @@
 #!/usr/bin/perl -w
 
 # ******************************************************************************
-# CLI Exerciser N' Tester                                                   v6.2
+# CLI Exerciser N' Tester                                                   v6.5
 #
-# Copyright (c) 2005 Frederic Thomas (fred(at)thomascorner.com)
+# Copyright (c) 2005-2006 Frederic Thomas (fred(at)thomascorner.com)
 #
 # This file might be distributed under the same terms as the
 # Slimserver (www.slimdevices.com)
@@ -35,12 +35,13 @@
 # - MacOS X 10.4.x
 #
 # Known restrictions:
-# - Commands not tested: listen, ir
+# - Commands not tested: listen, ir, and a lot more missing
 #
 # History:
 # 0.1 - Inital version for CLI in SlimServer 5.4.1
 # 6.1 - For CLI in SlimServer 6.1
 # 6.2 - For CLI in SlimServer 6.2
+# 6.5 - For CLI in SlimServer 6.5
 # ******************************************************************************
 
 # ******************************************************************************
@@ -145,22 +146,22 @@ my $gRestoreGroupDisc;
 
 print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.2\n\n";
 			
-#testConnectDisconnect();
-#testGeneral();
-#testPlayersQueries();
-#testPlayersSleep();
-#testPlayersPower();
-#testPlayersMixer();
-#testPlayersDisplay();
-#testDatabaseRescan();
-#testDatabaseGenres();
+testConnectDisconnect();
+testGeneral();
+testPlayersQueries();
+testPlayersSleep();
+testPlayersPower();
+testPlayersMixer();
+testPlayersDisplay();
+testDatabaseRescan();
+testDatabaseGenres();
 testDatabaseAlbums();
-#testDatabasePlaylists();
-#testDatabaseArtists();
-#testDatabaseTitles();
-#testDatabaseSonginfo();
-#testPlaylistPlay();
-#testPlaylistInfoNavigation();
+testDatabasePlaylists();
+testDatabaseArtists();
+testDatabaseTitles();
+testDatabaseSonginfo();
+testPlaylistPlay();
+testPlaylistInfoNavigation();
 
 test_PrintReport();
 
@@ -371,7 +372,7 @@ sub testPlayersSleep {
 		$gd_subtest && print("\nWaiting for 30 secs before sleep...\n");
 		sleep ($sleeptime - 30);
 		
-		my %vol;
+#		my %vol;
 		
 		# Test they still report sleep and note volume
 		for (my $i=0; $i<scalar @gplayers; $i++) {
@@ -386,7 +387,7 @@ sub testPlayersSleep {
 			test_SubTest(	$tid, 
 							"$playerid status.sleep == <sleeptime>", 
 							$cliCall{'sleep'} == $sleeptime);
-			$vol{$playerid} = cliQueryNum($playerid, ['mixer', 'volume']);
+#			$vol{$playerid} = cliQueryNum($playerid, ['mixer', 'volume']);
 		}
 		
 		# wait till 5 secs before sleep
@@ -406,9 +407,10 @@ sub testPlayersSleep {
 			test_SubTest(	$tid, 
 							"$playerid status.sleep == <sleeptime>", 
 							$cliCall{'sleep'} == $sleeptime);
-			test_SubTest(	$tid, 
-							"volume faded before sleep", 
-							$vol{$playerid} > cliQueryNum($playerid, ['mixer', 'volume']));
+# No more visible fade
+#			test_SubTest(	$tid, 
+#							"volume faded before sleep", 
+#							$vol{$playerid} > cliQueryNum($playerid, ['mixer', 'volume']));
 		}
 		
 		# wait till 1 secs after sleep
