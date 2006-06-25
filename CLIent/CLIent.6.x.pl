@@ -144,7 +144,7 @@ my $gRestoreGroupDisc;
 # Main program
 # ******************************************************************************
 
-print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.2\n\n";
+print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.5\n\n";
 			
 testConnectDisconnect();
 testGeneral();
