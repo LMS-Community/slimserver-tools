@@ -146,22 +146,22 @@ my $gRestoreGroupDisc;
 
 print "\nSlimServer CLI Exerciser N' Tester (CLIENT) 6.5\n\n";
 			
-testConnectDisconnect();
-testGeneral();
-testPlayersQueries();
-testPlayersSleep();
-testPlayersPower();
-testPlayersMixer();
-testPlayersDisplay();
-testDatabaseRescan();
-testDatabaseGenres();
-testDatabaseAlbums();
-testDatabasePlaylists();
-testDatabaseArtists();
+#testConnectDisconnect();
+#testGeneral();
+#testPlayersQueries();
+#testPlayersSleep();
+#testPlayersPower();
+#testPlayersMixer();
+#testPlayersDisplay();
+#testDatabaseRescan();
+#testDatabaseGenres();
+#testDatabaseAlbums();
+#testDatabasePlaylists();
+#testDatabaseArtists();
 testDatabaseTitles();
 testDatabaseSonginfo();
-testPlaylistPlay();
-testPlaylistInfoNavigation();
+#testPlaylistPlay();
+#testPlaylistInfoNavigation();
 
 test_PrintReport();
 
