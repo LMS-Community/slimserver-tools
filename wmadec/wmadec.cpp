@@ -40,8 +40,11 @@
 #include "getopt.h"
 
 #define ONE_SECOND (QWORD)10000000
-static char* gOptionStr = "qhb:r:n:o:";
+static char* gOptionStr = "dqhwb:r:n:o:l:";
 #define STREAM_BUFFER_SIZE 1024
+
+DWORD dwTotalSize = 0;
+BOOL bDebug = FALSE;
 
 class WMAStream : public IStream {
 public:
@@ -400,6 +403,11 @@ WMAReader::OnSample(DWORD dwOutputNum,
                     DWORD dwFlags,
                     INSSBuffer __RPC_FAR *pSample,
                     void __RPC_FAR *pvContext) {
+
+  if (bDebug) {
+    fprintf(stderr, "cnsSampleTime: [%d]\n", cnsSampleTime);
+  }
+
   if (dwOutputNum != m_dwOutputNum) {
     return S_OK;
   }
@@ -437,7 +445,12 @@ WMAReader::OnSample(DWORD dwOutputNum,
     // Write out samples
     if (!fwrite(pWriteBuf, sizeof(BYTE), dwSize, m_pOutput)) {
       m_hrAsync = -1;
+      if (bDebug) {
+        fprintf(stderr, "GOT fwrite event!\n");
+      }
       SetEvent(m_hEvent);
+    } else {
+      dwTotalSize += dwSize;
     }
     fflush(m_pOutput);
 
@@ -459,6 +472,9 @@ WMAReader::OnStatus(WMT_STATUS Status,
   switch( Status ) {
     case WMT_OPENED:
       m_hrAsync = hr;
+      if (bDebug) {
+        fprintf(stderr, "GOT WMT_OPENED event!\n");
+      }
       SetEvent(m_hEvent);        
       break;
     case WMT_STARTED:
@@ -466,13 +482,29 @@ WMAReader::OnStatus(WMT_STATUS Status,
       hr = m_pReaderAdvanced->DeliverTime(m_qwReaderTime);
       if (FAILED(hr)) {
         m_hrAsync = hr;
+        if (bDebug) {
+       	  fprintf(stderr, "GOT WMT_STARTED / FAILED event!\n");
+        }
         SetEvent(m_hEvent);        
       }
       break;
     case WMT_EOF:
+      m_hrAsync = hr;
+      if (bDebug) {
+        fprintf(stderr, "GOT WMT_EOF event!\n");
+      }
+      SetEvent(m_hEvent);        
+      break;
     case WMT_END_OF_STREAMING:
+      if (bDebug) {
+        fprintf(stderr, "GOT WMT_END_OF_STREAMING event!\n");
+      }
+      break;
     case WMT_ERROR:
       m_hrAsync = hr;
+      if (bDebug) {
+        fprintf(stderr, "GOT WMT_ERROR event!\n");
+      }
       SetEvent(m_hEvent);        
       break;
   }
@@ -487,7 +519,10 @@ WMAReader::OnTime(QWORD cnsCurrentTime,
   HRESULT hr = m_pReaderAdvanced->DeliverTime(m_qwReaderTime);
   if (FAILED(hr)) {
     m_hrAsync = hr;
-    SetEvent(m_hEvent);        
+    if (bDebug) {
+      fprintf(stderr, "GOT OnTime FAILED event!\n");
+    }
+    SetEvent(m_hEvent);
   }
   return S_OK;
 }
@@ -702,8 +737,10 @@ WMAReader::Decode(IStream* lpInput, FILE* pOutput) {
 void
 printUsage() {
   fprintf(stderr, 
-          "wmadec [-qh] [ -b bits_per_sample ] [ -r sample_rate ]\n"
+          "wmadec [-dqhw] [ -b bits_per_sample ] [ -r sample_rate ]\n"
           "[ -n num_channels ] [ -o outputfile ] [input]\n"
+          "-d\n"
+          "\tAdd debugging output.\n"
           "-q\n"
           "\tSuppresses program output.\n"
           "-h\n"
@@ -715,7 +752,50 @@ printUsage() {
           "-n n\n"
           "\tNumber of channels of output. Default is 2\n"
           "-o filename\n"
-          "\tWrite output to specified filename.  Default is stdout.\n");
+          "\tWrite output to specified filename.  Default is stdout.\n"
+          "-w\n"
+          "\tAdd wave headers\n"
+          "-l bytes\n"
+          "\tlength of decoded output in bytes");
+}
+
+// Superlexx: Write*Bits* and WriteWaveHeader are taken from LAME
+void
+Write16BitsLowHigh(FILE *fp, int i)
+{
+	putc(i&0xff,fp);
+	putc((i>>8)&0xff,fp);
+}
+
+// Superlexx: Write32Bits* and WriteWaveHeader are taken from LAME
+void
+Write32BitsLowHigh(FILE *fp, int i)
+{
+	Write16BitsLowHigh(fp,(int)(i&0xffffL));
+	Write16BitsLowHigh(fp,(int)((i>>16)&0xffffL));
+}
+
+// Superlexx: this function is slightly modified (pcmbytes is a parameter now)
+int WriteWaveHeader(FILE * const fp, 
+	const int freq, const int channels, const int bits, DWORD pcmbytes)
+{
+	int bytes = (bits + 7) / 8;
+
+	/* quick and dirty, but documented */
+	fwrite("RIFF", 1, 4, fp); /* label */
+	Write32BitsLowHigh(fp, pcmbytes + 44 - 8); /* length in bytes without header */
+	fwrite("WAVEfmt ", 2, 4, fp); /* 2 labels */
+	Write32BitsLowHigh(fp, 2 + 2 + 4 + 4 + 2 + 2); /* length of PCM format declaration area */
+	Write16BitsLowHigh(fp, 1); /* is PCM? */
+	Write16BitsLowHigh(fp, channels); /* number of channels */
+	Write32BitsLowHigh(fp, freq); /* sample frequency in [Hz] */
+	Write32BitsLowHigh(fp, freq * channels * bytes); /* bytes per second */
+	Write16BitsLowHigh(fp, channels * bytes); /* bytes per sample time */
+	Write16BitsLowHigh(fp, bits); /* bits per sample */
+	fwrite("data", 1, 4, fp); /* label */
+	Write32BitsLowHigh(fp, pcmbytes); /* length in bytes of raw PCM data */
+
+	return ferror(fp) ? -1 : 0;
 }
 
 int _tmain(int argc, _TCHAR* argv[])
@@ -727,10 +807,15 @@ int _tmain(int argc, _TCHAR* argv[])
   LPCSTR pOutputFile = NULL;
   FILE* pOutputHandle = stdout;
   BOOL bUsage = FALSE;
+  BOOL bWaveHeaders = FALSE;
+  DWORD dwPCMBytes = 0xFFFFFFFF;
 
   char c;
   while ((c = getopt(argc, argv, gOptionStr)) != EOF) {
     switch(c) {
+      case 'd':
+        bDebug = TRUE;
+        break;
       case 'q':
         bQuiet = TRUE;
         break;
@@ -765,6 +850,12 @@ int _tmain(int argc, _TCHAR* argv[])
       case 'o': 
         pOutputFile = optarg;
         break;
+      case 'w':
+	bWaveHeaders = TRUE;
+	break;
+      case 'l':
+	dwPCMBytes = atoi(optarg);
+	break;
       case '\0': 
         bUsage = TRUE;
     }
@@ -775,19 +866,24 @@ int _tmain(int argc, _TCHAR* argv[])
     exit(1);
   }
 
+  errno_t err;
+
   if (bQuiet) {
     pOutputHandle = NULL;
   }
   // Open the output file if one is specified.
   else if (pOutputFile) {
-    pOutputHandle = fopen(pOutputFile, "w+b");
-    if (!pOutputHandle) {
+    if ((err = fopen_s(&pOutputHandle, pOutputFile, "w+b")) != 0) {
       fprintf(stderr, "Error opening file %s for writing\n", pOutputFile);
     }
   }
   else {
-    setmode(fileno(stdout), O_BINARY);  
+    _setmode(_fileno(stdout), O_BINARY);  
     pOutputHandle = stdout;
+  }
+
+  if (bWaveHeaders) {
+    WriteWaveHeader(pOutputHandle, dwSamplesPerSec, dwNumChannels, wBitsPerSample, dwPCMBytes);
   }
 
   WMAReader* pReader = new WMAReader(wBitsPerSample,
@@ -798,7 +894,7 @@ int _tmain(int argc, _TCHAR* argv[])
     pReader->Decode(argv[optind], pOutputHandle);
   }
   else {
-    setmode(fileno(stdin), O_BINARY);   
+    _setmode(_fileno(stdin), O_BINARY);   
     WMAStream* pStream = new WMAStream(stdin);
     pStream->AddRef();
     pReader->Decode(pStream, pOutputHandle);    
@@ -808,7 +904,10 @@ int _tmain(int argc, _TCHAR* argv[])
   if (pOutputHandle && pOutputFile) {
     fclose(pOutputHandle);
   }
+
+  if (bDebug) {
+    fprintf(stderr, "dwTotalSize: [%d]\n", dwTotalSize);
+  }
   
   return 0;
 }
-
