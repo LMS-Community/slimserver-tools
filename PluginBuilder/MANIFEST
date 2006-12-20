@@ -1,0 +1,4 @@
+Makefile.PL
+MANIFEST
+README
+bin/create-slimserver-plugin

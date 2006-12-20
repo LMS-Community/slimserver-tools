@@ -1,0 +1,52 @@
+
+* SlimServer Plugin Builder
+======================================================================
+
+This tool allows you to build a SlimServer 7.0+ compatible plugin package.
+
+The basic layout of a plugin is as follows:
+
+topdir/
+	install.xml
+	strings.txt
+	lib/
+	lib/Path/To/Modules.pm
+
+All files listed above are mandatory.
+
+Additionally, one may have the following files, 
+which are referred to by install.xml:
+
+	bin/
+	HTML/
+	convert.conf
+
+All files in the topdir/ will be bundled into a .zip file, which is then
+installable via the SlimServer Web Interface. A '.par' file will be created
+from the perl modules in your lib/ path, which will pull in the appropriate
+dependencies.
+
+======================================================================
+
+* Please run 'perl Makefile.PL' to install the necessary dependencies.
+
+* If you wish to install these tools system-wide, run 'make install'
+
+Usage: ./bin/create-slimserver-plugin
+
+	--plugindir <dir>
+		This must point to the top level directory where your plugin is.
+
+	--slimserverdir <dir>
+
+		This must point to the top level of your SlimServer directory. 
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2006 by Slim Devices, Inc.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.6 or,
+at your option, any later version of Perl 5 you may have available.
+
+

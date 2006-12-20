@@ -1,0 +1,227 @@
+#!/usr/bin/perl
+
+# $Id$
+# 
+# Create a packaged slimserver plugin.
+
+use strict;
+use warnings;
+
+use Archive::Zip qw(:ERROR_CODES :CONSTANTS);
+use Data::UUID;
+use Getopt::Long;
+use File::Spec::Functions qw(:ALL);
+use File::Find ();
+use File::Temp qw(tempfile tempdir);
+use Module::CoreList;
+use XML::Simple;
+
+sub main {
+
+	my ($pluginDir, $slimserverDir);
+
+	GetOptions(
+		'plugindir=s'     => \$pluginDir,
+		'slimserverdir=s' => \$slimserverDir,
+	);
+
+	if (!defined $slimserverDir || !-d $slimserverDir || !-f catdir($slimserverDir, 'strings.txt')) {
+
+		die "$0: Need --slimserverdir!\n";
+	}
+
+	if (!defined $pluginDir || !-d $pluginDir || !-f catdir($pluginDir, 'install.xml')) {
+
+		die "$0: Need --plugindir!\n";
+	}
+
+	my $tempDir = tempdir(CLEANUP => 1);
+	my ($excludeFH, $excludeFile) = tempfile(DIR => $tempDir);
+
+	print "* Starting module packaging process..\n\n";
+	print "- Created temp file [$excludeFile] for module exclude list\n\n";
+
+	generateExcludeList($slimserverDir, $excludeFH);
+
+	close($excludeFH);
+
+	my $metaData = readPluginMetaData($pluginDir);
+
+	generatePARFile($pluginDir, $metaData, $excludeFile);
+
+	my $zipFile = generateZipFile($pluginDir, $metaData);
+
+	if (-f $zipFile) {
+
+		print "* Packaged plugin ok! File: [$zipFile] is ready for posting\n";
+	}
+}
+
+sub generateExcludeList {
+	my $baseDir = shift;
+	my $outFile = shift;
+
+	print "- Generating module exclude list from the SlimServer root directory\n\n";
+
+	my @coreModules = keys %{$Module::CoreList::version{$]}};
+	my @slimModules = ();
+	my @slimDirs    = map { catdir($baseDir, $_) } qw(Slim Plugins lib CPAN);
+
+	for my $incDir (@slimDirs) {
+
+		File::Find::find({
+			wanted => sub {
+
+				my $file = $File::Find::name;
+
+				return unless -f $file and $file =~ /\.pm/i;
+
+				$file =~ s/^\Q$incDir\E(?:\\|\/)?//;
+				$file =~ s/(?:\\|\/)/::/g;
+				$file =~ s/\.[^.]+$//;
+
+				push @slimModules, $file;
+			},
+
+			no_chdir => 1,
+
+		}, $incDir);
+	}
+
+	my %modules = (map { $_ => undef } @slimModules, @coreModules);
+
+	for my $key (keys %modules) {
+
+		if ($^O !~ /win32/i && $key =~ /win32/i) {
+
+			delete $modules{$key};
+		}
+	}
+
+	print $outFile map {"-X $_\n"} sort keys %modules;
+}
+
+sub readPluginMetaData {
+	my $baseDir = shift;
+
+	my $installXML = catdir($baseDir, 'install.xml');
+
+	if (!-f $installXML) {
+
+		die "No install.xml file in the plugin root directory!\n";
+	}
+
+	print "- Fetching plugin metadata from $installXML\n\n";
+
+	my $metadata = eval { XMLin($installXML) };
+
+	if ($@) {
+		die "There was an error in your $installXML file: [$@]\n";
+	}
+
+	for my $key (qw(name module version description creator email)) {
+
+		if (!defined $metadata->{$key}) {
+
+			die "Error: Missing <$key>...</$key> in $installXML\n";
+		}
+	}
+
+	if (!$metadata->{'id'}) {
+
+		my $uuid = Data::UUID->new;
+
+		$metadata->{'id'} = $uuid->create_str;
+
+		open(OUT, ">$installXML") or die $!;
+
+		print OUT XMLout($metadata,
+			RootName   => 'extension',
+			NoAttr     => 1,
+			XMLDecl    => 1,
+		);
+
+		close(OUT);
+	}
+
+	return $metadata;
+}
+
+sub generatePARFile {
+	my $baseDir = shift;
+	my $plugin  = shift;
+	my $exclude = shift;
+
+	print "- Generating .par file from $plugin->{'module'} in $baseDir\n\n";
+
+	my $libDir  = catdir($baseDir, 'lib');
+	my $name    = $plugin->{'module'};
+	my $parFile = catdir($libDir, "$name.par");
+
+	$parFile =~ s/::/-/g;
+
+	if (!-d $libDir) {
+
+		die "No lib/ in $baseDir!\n";
+	}
+
+	if (-f $parFile) {
+
+		print "- Removing old $parFile\n\n";
+
+		unlink($parFile) or die "Couldn't remove [$parFile] - $!\n";
+	}
+
+	my $command = "pp \@$exclude -p -o $parFile -I $libDir -M $name -e 1";
+
+	print "- Running: '$command'\n\n";
+
+	system($command);
+
+	if (-f $parFile) {
+
+		print "- PAR file: [$parFile] created ok!\n\n";
+	}
+}
+
+sub generateZipFile {
+	my $baseDir = shift;
+	my $plugin  = shift;
+
+	my $zipFile = join('.', $plugin->{'module'}, 'zip');
+        $zipFile =~ s/::/-/g;
+
+	if (-f $zipFile) {
+
+		print "- Removing old $zipFile\n\n";
+
+		unlink($zipFile) or die "Couldn't remove [$zipFile] - $!\n";
+	}
+
+	print "- About to write out zipFile: [$zipFile] from $baseDir\n\n";
+
+	my $zip = Archive::Zip->new;
+
+	$zip->addTreeMatching($baseDir, undef, '\.par$');
+	$zip->addTreeMatching($baseDir, undef, '\.xml$');
+	$zip->addTreeMatching($baseDir, undef, '\.js$');
+	$zip->addTreeMatching($baseDir, undef, '\.html?$');
+	$zip->addTreeMatching($baseDir, undef, '\.jpe?g$');
+	$zip->addTreeMatching($baseDir, undef, '\.gif$');
+	$zip->addTreeMatching($baseDir, undef, '\.png$');
+	$zip->addTreeMatching($baseDir, undef, '\.txt$');
+	$zip->addTreeMatching($baseDir, undef, '\.conf$');
+	$zip->addTreeMatching($baseDir, undef, '\bbin\b');
+
+	my $status = $zip->writeToFileNamed($zipFile);
+
+	if ($status != AZ_OK) {
+
+		print "An error occurred while writing out: [$zipFile] exiting!\n";
+		die;
+	}
+
+	return $zipFile;
+}
+
+main();
