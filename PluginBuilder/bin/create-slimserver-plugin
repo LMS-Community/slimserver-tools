@@ -18,11 +18,12 @@ use XML::Simple;
 
 sub main {
 
-	my ($pluginDir, $slimserverDir);
+	my ($pluginDir, $slimserverDir, $parOnly);
 
 	GetOptions(
 		'plugindir=s'     => \$pluginDir,
 		'slimserverdir=s' => \$slimserverDir,
+		'paronly'         => \$parOnly,
 	);
 
 	if (!defined $slimserverDir || !-d $slimserverDir || !-f catdir($slimserverDir, 'strings.txt')) {
@@ -47,13 +48,20 @@ sub main {
 
 	my $metaData = readPluginMetaData($pluginDir);
 
-	generatePARFile($pluginDir, $metaData, $excludeFile);
+	my $parFile  = generatePARFile($pluginDir, $metaData, $excludeFile);
 
-	my $zipFile = generateZipFile($pluginDir, $metaData);
+	if ($parOnly) {
 
-	if (-f $zipFile) {
+		print "* Packaged plugin ok - PAR Only! File: [$parFile] is ready for posting\n";
 
-		print "* Packaged plugin ok! File: [$zipFile] is ready for posting\n";
+	} else {
+
+		my $zipFile = generateZipFile($pluginDir, $metaData);
+
+		if (-f $zipFile) {
+
+			print "* Packaged plugin ok! File: [$zipFile] is ready for posting\n";
+		}
 	}
 }
 
@@ -181,7 +189,13 @@ sub generatePARFile {
 	if (-f $parFile) {
 
 		print "- PAR file: [$parFile] created ok!\n\n";
+
+	} else {
+
+		print "- PAR file: [$parFile] NOT CREATED!!\n\n";
 	}
+
+	return $parFile;
 }
 
 sub generateZipFile {
