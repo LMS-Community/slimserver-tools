@@ -10,6 +10,7 @@ use warnings;
 use Archive::Zip qw(:ERROR_CODES :CONSTANTS);
 use Data::UUID;
 use Getopt::Long;
+use File::Basename qw(dirname);
 use File::Spec::Functions qw(:ALL);
 use File::Find ();
 use File::Temp qw(tempfile tempdir);
@@ -73,9 +74,9 @@ sub generateExcludeList {
 
 	my @coreModules = keys %{$Module::CoreList::version{$]}};
 	my @slimModules = ();
-	my @slimDirs    = map { catdir($baseDir, $_) } qw(Slim Plugins lib CPAN);
+	my @slimDirs    = qw(Slim Plugins lib CPAN);
 
-	for my $incDir (@slimDirs) {
+	for my $incDir (map { catdir($baseDir, $_)} @slimDirs) {
 
 		File::Find::find({
 			wanted => sub {
@@ -84,7 +85,14 @@ sub generateExcludeList {
 
 				return unless -f $file and $file =~ /\.pm/i;
 
-				$file =~ s/^\Q$incDir\E(?:\\|\/)?//;
+				my $fileBase = $incDir;
+
+				if ($incDir =~ /\bSlim$/ || $incDir =~ /\bPlugins$/) {
+
+					$fileBase = dirname($incDir);
+				}
+
+				$file =~ s/^\Q$fileBase\E(?:\\|\/)?//;
 				$file =~ s/(?:\\|\/)/::/g;
 				$file =~ s/\.[^.]+$//;
 
