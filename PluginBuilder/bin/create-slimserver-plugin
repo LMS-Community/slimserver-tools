@@ -231,6 +231,7 @@ sub generateZipFile {
 	$zip->addTreeMatching($baseDir, undef, '\.jpe?g$');
 	$zip->addTreeMatching($baseDir, undef, '\.gif$');
 	$zip->addTreeMatching($baseDir, undef, '\.png$');
+	$zip->addTreeMatching($baseDir, undef, '\.bmp$');
 	$zip->addTreeMatching($baseDir, undef, '\.txt$');
 	$zip->addTreeMatching($baseDir, undef, '\.conf$');
 	$zip->addTreeMatching($baseDir, undef, '\bbin\b');
