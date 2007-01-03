@@ -228,6 +228,7 @@ sub generateZipFile {
 	$zip->addTreeMatching($baseDir, undef, '\.xml$');
 	$zip->addTreeMatching($baseDir, undef, '\.js$');
 	$zip->addTreeMatching($baseDir, undef, '\.html?$');
+	$zip->addTreeMatching($baseDir, undef, '\.css$');
 	$zip->addTreeMatching($baseDir, undef, '\.jpe?g$');
 	$zip->addTreeMatching($baseDir, undef, '\.gif$');
 	$zip->addTreeMatching($baseDir, undef, '\.png$');
