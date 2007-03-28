@@ -1,4 +1,4 @@
-	Slim Devices Visualizer Plugin Architecture
+	Squeezebox Visualizer Plugin Architecture
 
 Overview:
 
