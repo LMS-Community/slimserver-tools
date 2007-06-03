@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: 4; c-basic-offset: 4 -*- */
 //
-// SlimServer Copyright (C) 2003-2004 Vidur Apparao, Logitech.
+// SlimServer Copyright (C) 2003-2004 Vidur Apparao, Slim Devices Inc.
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License,
 // version 2.
@@ -21,6 +21,7 @@
 // stdout.
 // 
 // ++++++
+// Version 1.1
 // Updated to allow the 1st command in a pipeline to write to a file instead of stdout
 // To use this option include the string PIPE_TOKEN in the first command and it will get
 // replaced by a windows named pipe when this command is executed
@@ -31,81 +32,224 @@
 // A second thread at higher priority is created to move data from the Named Pipe to the
 // second process/output.  The main thread monitors its progress and kills it if no 
 // data is moved within the period TIMEOUT.
-// To debug this mode use the alternative token DEBUG_PIPE_TOKEN (#DEBUGPIPE#)
+// To debug this mode use the alternative token DEBUG_PIPE_TOKEN (#DEBUGPIPE#) - depreciated
 // Caveat: This mode will only work on Windows versions supporting CreateNamedPipe: NT/2K/XP/2003
+//
+// ++++++
+// Version 1.2/1.3 - Ian Cook, Bryan Alton
+// Completely updated to avoid passing socket handles between processes. Whatever method 
+// was tried to do this, it was broken by various 3rd party software 
+// (e.g. VPN clients/firewalls etc)
+//
+// The new approach is to use pipes to communicate with all child processes and use
+// additional worker threads in socketwrapper to transfer data between the pipes and the 
+// sockets (which are now all local to the socketwrapper process itself)
+// 
+// ++++++
+// Version 1.4
+// Modified debugging to be triggered by -d | -D command line option for better integration with server
+//
+// ++++++
+// Version 1.5
+// First attempt at solving truncation issue.
+//
+// ++++++
+// Version 1.6
+// Added changes to close pipe at main level and flush buffers to avoid truncation.
+//
+// ++++++
+// Version 1.7
+// Made watchog optional because of problem with paused files. 
+// Watchdog is enabled by -w .  This is needed for use with streaming audio such as AlienBBC
+// in case stream stops and socketwrapper thread hangs on a read.
+//
+// ++++++
+// Version 1.8
+// Fix Lame truncation problem.
 
 #include <process.h>
 #include "stdafx.h"
 #include "getopt.h"
 
-// defines & global vars for NPIPE mode
+#define	 SW_ID			  "Socketwrapper 1.8\n"
+
+// defines & global vars for extra thread mode
+#define  MAX_STEPS        16
 #define  PIPE_TOKEN       "#PIPE#"                     // token to look for
-#define  DEBUG_PIPE_TOKEN "#DEBUGPIPE#"                // alternative token - debug enabled 
 #define  PIPE_NAME_ROOT   "\\\\.\\pipe\\socketwrapper" // root of named pipe name
-#define  BUFFER_SIZE      4096                         // size of buffer for transfers & named pipe
+#define  BUFFER_SIZE      8192                         // size of buffer for transfers & named pipe
 #define  TIMEOUT          60000                        // timeout for wait checking thread state
 #define  DEBUG_TIMEOUT    10000                        // timeout when in debug mode
 
-HANDLE hRWReader = INVALID_HANDLE_VALUE, hRWWriter = INVALID_HANDLE_VALUE;
-UINT   watchDogCount = 1;
-BOOL   bDebug = FALSE;
+// info about each step in process (also used as context for thread creation)
+typedef struct
+{
+	int i;
+	bool fIsWorkerThread;	// true for thread, false for child process
+	bool fInputIsNamed;		// for thread, true if input handle is named pipe false otherwise
+	bool fOutputIsSocket;   // true for last thread sending output to a socket
+	char *pBuff;			// either transfer buffer for thread or cmdline for process
+	HANDLE hInput;			// input handle for process/thread
+	HANDLE hOutput;			// output handle for process/thread
+	DWORD WatchDog;			// watchdog for worker threads
+	DWORD nBlocks;			// number of "blocks" read
+	DWORD nBytes;			// number of bytes read
+} Stage;
 
-static char* gOptionStr = "i:o:c:";
-
-void
-KillAllProcesses(PHANDLE pProcessHandles, int numProcesses) {
-	for (int i = 0; i < numProcesses; i++) {
-		if (pProcessHandles[i] == INVALID_HANDLE_VALUE) {
-			break;
-		}
-		TerminateProcess(pProcessHandles[i], 0);
-		CloseHandle(pProcessHandles[i]);
-	}
-}
+BOOL bWatchdogEnabled = FALSE;
+BOOL bDebug = FALSE;
+BOOL bDebugVerbose = FALSE;
 
 void
 printUsage() {
-	fprintf(stderr, 
-	  "socketwrapper -i port -o port -c command\n"
-	  "-o port\n"
-	  "\tUnix domain port to connect to for output.\n"
-	  "-i port\n"
-	  "\tUnix domain port to connect to for input.\n"
-	  "-c command\n"
-	  "\tCommand to execute.\n");
+	fprintf(stderr,
+		SW_ID
+		"Usage: socketwrapper -i port -o port [-d | -D] -c command\n"
+		"-o port \tUnix domain port to connect to for output.\n"
+		"-i port \tUnix domain port to connect to for input.\n"
+		"-c command \tCommand to execute.\n"
+		"-w \t\tEnables watchdog.\n"
+		"-d \t\tEnable debugging ouput.\n"
+		"-D \t\tEnable Verbose debugging ouput.\n"
+	);
 }
 
-unsigned __stdcall
-MoveData(void *buff) {
-	// Called as a new thread to move data between NPIPE and second command
-	if (!ConnectNamedPipe(hRWReader, NULL)) {
-		if (bDebug)
-			fprintf(stderr, "SW: Failed Connect to Named Pipe\n"); 
-		_endthreadex(1); 
-		return 1;
-	} 
-	DWORD bytesread, byteswritten;
-	while (ReadFile(hRWReader, buff, BUFFER_SIZE, &bytesread, NULL)){
-		if (!WriteFile(hRWWriter, buff, bytesread, &byteswritten, NULL)) 
-			break;
-		watchDogCount++;  // main thread monitors this
-		if (bDebug)
-			fprintf(stderr, "SW: Transfering: %u\r", watchDogCount);
+
+void 
+stderrMsg ( const char *fmt, ...) {
+
+        SYSTEMTIME st;
+		va_list ap;
+        GetLocalTime(&st);
+        fprintf(stderr, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d ", 
+                   st.wYear, st.wMonth,  st.wDay, st.wHour, 
+                   st.wMinute, st.wSecond, st.wMilliseconds);
+		va_start(ap,fmt);
+		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+
+	fflush(stderr);
+}
+
+void 
+debugMsg ( const char *fmt, ...) {
+	va_list ap;
+    SYSTEMTIME st;
+	char errmsg[256];
+
+	if (bDebug){
+        GetLocalTime(&st);
+        fprintf(stderr, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d ", 
+                   st.wYear, st.wMonth,  st.wDay, st.wHour, 
+                   st.wMinute, st.wSecond, st.wMilliseconds);
+
+		va_start(ap,fmt);
+        vfprintf(stderr, fmt, ap);
+		va_end(ap);
+		fflush(stderr);
+
 	}
-	if (bDebug)
-		fprintf(stderr, "SW: Transfering complete          \n");
+}
+
+//
+// MoveDataThreadProc
+//
+// this is used for transferring data (when appropriate) as follows
+//	* from the named pipe to the next process (the original use of an extra thread)
+//  * from the input socket via a pipe to the first process
+//	* from the last process via a pipe to the output socket
+//
+unsigned __stdcall MoveDataThreadProc(void *pv) 
+{
+	Stage *pS = (Stage *)pv;
+	bool fShowDebug = true;
+	DWORD nNummsgs = 0;
+
+	debugMsg ( "MoveDataThreadProc for step %i started.\n", pS->i );
+
+	// if the input handle is for a named pipe then wait for the other end
+	if( pS->fInputIsNamed ){
+
+		if( !ConnectNamedPipe( pS->hInput, NULL) ) {
+			stderrMsg ( "MoveDataThreadProc for step %i failed to attach to named pipe.\n", pS->i );
+			_endthreadex(1); 
+			return 1;
+		} 
+
+		debugMsg ( "MoveDataThreadProc for step %i attached to named pipe.\n", pS->i );
+	}
+
+	DWORD bytesread, byteswritten;
+
+	for(;;)	{
+
+		if( fShowDebug ) {
+			debugMsg ( "MoveDataThreadProc for step %i about to call ReadFile.\n", pS->i );
+		}
+
+		// wait for some data from input
+		if( !ReadFile(pS->hInput, pS->pBuff, BUFFER_SIZE, &bytesread, NULL) ) {
+			stderrMsg ( "MoveDataThreadProc for step %i failed reading with error %i.\n", pS->i, GetLastError() );
+			break;
+		}
+
+		pS->nBytes += bytesread;
+		pS->nBlocks++;
+
+		// log when data starts
+		if( fShowDebug ) {
+			debugMsg ( "MoveDataThreadProc for step %i got %i bytes, about to write data.\n", pS->i, bytesread );
+			nNummsgs++;
+		}
+
+		// pass data to output
+		if (!pS->fOutputIsSocket){
+			if( !WriteFile(pS->hOutput, pS->pBuff, bytesread, &byteswritten, NULL) ) {
+				stderrMsg ( "MoveDataThreadProc for step %i failed WriteFile with error %i.\n", pS->i, GetLastError() );
+				break;
+			}
+		} else {
+			byteswritten = send ((SOCKET) pS->hOutput, pS->pBuff, bytesread, 0 );
+			if (byteswritten == INVALID_SOCKET) {
+				stderrMsg ( "MoveDataThreadProc for step %i failed Send writing with error %i.\n", pS->i, WSAGetLastError());
+				break;
+			}
+			if (byteswritten != bytesread) {
+				stderrMsg ( "MoveDataThreadProc for step %i : bytesread=%i byteswritten=%i\n", pS->i, bytesread, byteswritten );
+				break;
+			}
+		}
+
+		// increase watchdog counter
+		++(pS->WatchDog);
+
+		// turn off debug once going and verbose debug is not set
+		if (nNummsgs > 1 && !bDebugVerbose) fShowDebug = false;
+	}
+
+
+	debugMsg ( "MoveDataThreadProc for step %i ending.\n", pS->i );
+	if (!FlushFileBuffers(pS->hOutput)) {
+			stderrMsg ( "Error Flushing Output in Thread for step %d: %d\n", pS->i, GetLastError());
+			Sleep(250);
+	}
+	CloseHandle(pS->hOutput );
 	_endthreadex(0); 
 	return 0;
 }
 
-DWORD main(int argc, char **argv) 
+
+
+DWORD main(int argc, char **argv)
 {
 	USHORT inputPort = 0, outputPort = 0;
+	SOCKET inputSocket = INVALID_SOCKET, outputSocket = INVALID_SOCKET;
 	LPSTR command = NULL;
-
+	DWORD ret = 0;
+	
 	// Parse the command line arguments
 	char c;
-	while ((c = getopt(argc, argv, gOptionStr)) != EOF) {
+	while ((c = getopt(argc, argv, "i:o:c:wdD")) != EOF) {
 		switch(c) {
 			case 'i':
 				inputPort = atoi(optarg);
@@ -116,86 +260,47 @@ DWORD main(int argc, char **argv)
 			case 'c':
 				command = optarg;
 				break;
+			case 'w':
+				bWatchdogEnabled = true;
+				break;
+			case 'd':
+				bDebug = true;
+				break;
+			case 'D':
+				bDebug = true;
+				bDebugVerbose = true;
+				break;
 			case '\0':
 				printUsage();
 				return -1;
 		}
 	}
 
+	debugMsg ( SW_ID );
+
 	if (!command) {
 		printUsage();
 		return -1;
 	}
+
+	debugMsg( "-i %i -o %i -c %s\n", inputPort, outputPort, command );
 
 	// Initialize Winsock
 	WORD wVersionRequested = MAKEWORD( 1, 1 );
 	WSADATA wsaData;
 	int err = WSAStartup( wVersionRequested, &wsaData );
 	if ( err != 0 ) {
-		fprintf(stderr, "SW: Couldn't initialize winsock\n");
+		stderrMsg( " Couldn't initialize winsock\n");
 		return -1;
 	}
 
-	// Connect to the specified ports
-	SOCKET inputSocket = INVALID_SOCKET, outputSocket = INVALID_SOCKET;
-	HANDLE inputSocketDup = INVALID_HANDLE_VALUE, outputSocketDup = INVALID_HANDLE_VALUE;
-	int iMode = 0;
-	struct sockaddr_in addr;
-	
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	if (inputPort != 0) {
-		inputSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
-		if (inputSocket == INVALID_SOCKET) {
-			fprintf(stderr, "SW: Error creating input socket: %d\n", WSAGetLastError());
-			return -1;
-		}
-		ioctlsocket(inputSocket, FIONBIO, (u_long FAR*) &iMode);
+	// reset our arrays
+	int numSteps = 0;
 
-		addr.sin_port = htons(inputPort);
-		if (connect(inputSocket, (const sockaddr*)&addr, 
-					sizeof(addr)) == SOCKET_ERROR) {
-			fprintf(stderr, "SW: Error connecting to input socket: %d\n", WSAGetLastError());
-			return -1;
-		}
+	Stage info[MAX_STEPS] = {0};
+	HANDLE hChild[MAX_STEPS] = {0};
 
-		if (!DuplicateHandle(GetCurrentProcess(), (HANDLE)inputSocket,
-						     GetCurrentProcess(), &inputSocketDup, 0,
-							 TRUE, DUPLICATE_SAME_ACCESS)) {
-			fprintf(stderr, "SW: Error duplicating input handle: %d\n",
-					GetLastError());
-			return -1;
-		}
-	}
-
-	if (outputPort != 0) {
-		outputSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
-		if (outputSocket == INVALID_SOCKET) {
-			fprintf(stderr, "SW: Error creating output socket: %d\n", WSAGetLastError());
-			return -1;
-		}
-		ioctlsocket(outputSocket, FIONBIO, (u_long FAR*) &iMode);
-
-		addr.sin_port = htons(outputPort);
-		if (connect(outputSocket, (const sockaddr*)&addr, 
-					sizeof(addr)) == SOCKET_ERROR) {
-			fprintf(stderr, "SW: Error connecting to output socket: %d\n", WSAGetLastError());
-			return -1;
-		}
-
-		WSAPROTOCOL_INFO pi;
-		if( WSADuplicateSocket( outputSocket, GetCurrentProcessId(), &pi ) ) {
-			fprintf(stderr, "SW: Error duplicating output socket: %d\n", GetLastError());
-			return -1;
-		}
-		outputSocketDup = (HANDLE)WSASocket( FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &pi, 0, 0 );
-		if (outputSocketDup == (HANDLE)INVALID_SOCKET) {
-			fprintf(stderr, "SW: Error opening duplicate output socket: %d\n", WSAGetLastError());
-			return -1;
-		}
-	}
-
-	// Find out how many processes we need to spawn
+	// count processes to spawn
 	int numProcesses = 0;
 	LPSTR token = strtok(command, "|");
 	while (token) {
@@ -203,104 +308,223 @@ DWORD main(int argc, char **argv)
 		token = strtok(NULL, "|");
 	}
 
-	// Allocate process handle array (+1 for NPIPE move thread handle)
-	PHANDLE pProcessHandles = new HANDLE[numProcesses+1];
-	PHANDLE pThreadHandles = new HANDLE[numProcesses+1];
-	for (int i = 0; i < (numProcesses+1); i++) {
-		pProcessHandles[i] = INVALID_HANDLE_VALUE;
-		pThreadHandles[i] = INVALID_HANDLE_VALUE;
-	}
+	// input socket - use via unnamed pipe and worker thread
+	if( inputPort )
+	{
+		debugMsg ( "Input from socket ...\n");
+		struct sockaddr_in addr;
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-	// Check for PIPE_TOKEN in first command and set vars for named pipe mode
-	LPSTR lpszCmdBuf = (LPSTR)malloc (strlen(command)+1);
-	LPSTR lpszCmdWithPipe = (LPSTR)malloc (strlen(command)+strlen(PIPE_NAME_ROOT)+8);
-	LPSTR lpszPipeName = (LPSTR)malloc (strlen(PIPE_NAME_ROOT)+7);
-	if (!lpszCmdBuf || !lpszCmdWithPipe || !lpszPipeName){
-		fprintf(stderr, "SW: Error Allocating String Buffers\n");
-		return -1;
-	}
-	sprintf(lpszPipeName, "%s%06d", PIPE_NAME_ROOT, getpid());
-	strcpy(lpszCmdBuf,command);
-	LPSTR p = strstr(lpszCmdBuf, PIPE_TOKEN);
-	if (p == NULL) {
-		p = strstr(lpszCmdBuf, DEBUG_PIPE_TOKEN);
-		bDebug = (p != NULL);
-	}
-	BOOL bUseNamedPipe = (p != NULL);
-	if (bUseNamedPipe) {
-		*p = '\0';
-		bDebug ? p = p+strlen( DEBUG_PIPE_TOKEN ) : p = p+strlen( PIPE_TOKEN );
-		sprintf(lpszCmdWithPipe, "%s%s%s", lpszCmdBuf, lpszPipeName, p); 
-	}
-
-	// Now create the processes and the pipes between them
-	token = command;
-	HANDLE hNextInput = (inputSocketDup == INVALID_HANDLE_VALUE) ? 
-		GetStdHandle(STD_INPUT_HANDLE) : inputSocketDup;
-	for (int i = 0; i < numProcesses; i++) {
-		HANDLE hInput = hNextInput, hOutput;
-		// If this is the last process, use the output socket
-		if (i == numProcesses-1) {
-			hOutput = (outputSocketDup == INVALID_HANDLE_VALUE) ? 
-				GetStdHandle(STD_OUTPUT_HANDLE) : outputSocketDup;
+		inputSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
+		if (inputSocket == INVALID_SOCKET) {
+			stderrMsg( " Input socket creation error: %d\n", WSAGetLastError());
+			ret = -1;
+			goto tidy;
 		}
-		// Otherwise, create a pipe to connect to the next process
-		else {
-			SECURITY_ATTRIBUTES saAttr; 
 
+		int iMode = 0;
+		ioctlsocket(inputSocket, FIONBIO, (u_long FAR*) &iMode);
+
+		addr.sin_port = htons(inputPort);
+		if (connect(inputSocket, (const sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
+			stderrMsg( " input socket connection error: %d\n", WSAGetLastError());
+			ret = -1;
+			goto tidy;
+		}
+
+		debugMsg ( "Input socket connected OK.\n");
+
+		info[numSteps].hInput = (HANDLE)inputSocket;
+		info[numSteps].fIsWorkerThread = true;
+		info[numSteps].fInputIsNamed = false;
+		info[numSteps].fOutputIsSocket = false;
+		
+		SECURITY_ATTRIBUTES saAttr; 
+		saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+		saAttr.bInheritHandle = TRUE; 
+		saAttr.lpSecurityDescriptor = NULL; 
+		
+		if (!CreatePipe(&(info[numSteps+1].hInput),
+						&(info[numSteps].hOutput), 
+						&saAttr, 0)){
+			stderrMsg ( "Input socket pipe creation error: %d\n", GetLastError());
+			ret = -1;
+			goto tidy;
+		}
+
+		debugMsg ( "Input socket pipe created OK.\n");
+		++numSteps;
+	}
+	else{
+		info[numSteps].hInput = GetStdHandle(STD_INPUT_HANDLE);
+	}
+
+	// command line
+	token = command;
+	for (int i = 0; i < numProcesses; i++) 
+	{
+		while( *token==' ' ) ++token;
+
+		LPSTR p = strstr(token, PIPE_TOKEN);
+
+		if (p != NULL) // PIPE_TOKEN found
+		{
+			LPSTR p2 = p;
+			char pszNP[sizeof(PIPE_NAME_ROOT)+8];
+			sprintf( pszNP, "%s%06d", PIPE_NAME_ROOT, getpid() );
+			size_t n = strlen(token)+strlen(PIPE_NAME_ROOT)+8;
+			info[numSteps].pBuff = (char *)malloc(n);
+			if( info[numSteps].pBuff == NULL) {
+				stderrMsg ( "pBuff malloc failed\n");
+				ret = -1;
+				goto tidy;
+			}
+
+			p = p+strlen( PIPE_TOKEN );
+			*p2='\0';
+			sprintf((char *)info[numSteps].pBuff, "%s%s%s", token, pszNP, p); 
+			*p2='#';
+			info[numSteps+1].hInput = CreateNamedPipe( pszNP,
+							PIPE_ACCESS_INBOUND,
+							PIPE_TYPE_BYTE|PIPE_WAIT,
+							1,
+							BUFFER_SIZE,
+							BUFFER_SIZE,
+							INFINITE,
+							NULL);
+			if(info[numSteps+1].hInput == INVALID_HANDLE_VALUE) {
+				stderrMsg ( "Error Creating Named Pipe: %d\n", GetLastError());
+				ret = -1;
+				goto tidy;
+			}
+			info[numSteps].hOutput = GetStdHandle(STD_ERROR_HANDLE);
+			++numSteps;
+
+			info[numSteps].fIsWorkerThread = true;
+			info[numSteps].fInputIsNamed = true;
+			info[numSteps].fOutputIsSocket = false;
+
+		} else {  // no PIPE_TOKEN
+			info[numSteps].pBuff = (char *)malloc(strlen(token)+1);
+			if( info[numSteps].pBuff == NULL) {
+				stderrMsg ( "malloc failed\n");
+				ret = -1;
+				goto tidy;
+			}
+			strcpy( (char *)info[numSteps].pBuff, token );
+		}
+
+		if ( i != numProcesses - 1 || outputPort ) {
+
+			SECURITY_ATTRIBUTES saAttr; 
 			saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
 			saAttr.bInheritHandle = TRUE; 
 			saAttr.lpSecurityDescriptor = NULL; 
 			
-			HANDLE hPipeReader, hPipeWriter;
-			if (!CreatePipe(&hPipeReader,
-							&hPipeWriter, 
+			if (!CreatePipe(&(info[numSteps+1].hInput),
+							&(info[numSteps].hOutput), 
 							&saAttr, 0)){
-				fprintf(stderr, "SW: Error Creating Pipe: %d\n", GetLastError());
-				KillAllProcesses(pProcessHandles, numProcesses);
-				return -1;
+				stderrMsg ( "Error Creating Pipe: %d\n", GetLastError());
+				ret = -1;
+				goto tidy;
 			}
-
-			hOutput = hPipeWriter;
-			hNextInput = hPipeReader;
-		}
-		if (i == 0 && bUseNamedPipe) {
-			//Create Named Pipe
-			HANDLE hNPipe = CreateNamedPipe(lpszPipeName,
-											PIPE_ACCESS_INBOUND,
-											PIPE_TYPE_BYTE|PIPE_WAIT,
-											1,
-											BUFFER_SIZE,
-											BUFFER_SIZE,
-											INFINITE,
-											NULL);
-			if(hNPipe == INVALID_HANDLE_VALUE) {
-				fprintf(stderr,"SW: Error Creating Named Pipe: %d\n", GetLastError());
-				KillAllProcesses(pProcessHandles, numProcesses);
-				return -1;
-			}
-			if (bDebug)
-				fprintf(stderr, "SW: Created Named Pipe: %s\n", lpszPipeName);
-			hRWReader = hNPipe;
-			hRWWriter = hOutput;
-			hOutput = GetStdHandle(STD_ERROR_HANDLE);
 		}
 
-		STARTUPINFO siStartInfo;
-		PROCESS_INFORMATION piProcInfo; 
+		// last process
+		if ( i == numProcesses - 1 ) {
+
+			if ( outputPort ){
+				// anon pipe already done
+				// open socket
+				++numSteps;
+				info[numSteps].fIsWorkerThread = true;
+				info[numSteps].fInputIsNamed = false;
+				info[numSteps].fOutputIsSocket = true;
+
+				outputSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
+				if (outputSocket == INVALID_SOCKET) {
+					stderrMsg ( "Error creating output socket: %d\n", WSAGetLastError());
+					ret = -1;
+					goto tidy;
+				}
+				int iMode = 0;
+				ioctlsocket(outputSocket, FIONBIO, (u_long FAR*) &iMode);
+
+				struct sockaddr_in addr;
+				addr.sin_family = AF_INET;
+				addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+				addr.sin_port = htons(outputPort);
+				if (connect(outputSocket, (const sockaddr*)&addr, 
+							sizeof(addr)) == SOCKET_ERROR) {
+					stderrMsg ( "Error connecting to output socket: %d\n", WSAGetLastError());
+					ret = -1;
+					goto tidy;
+				}
+				info[numSteps].hOutput = (HANDLE)outputSocket;
+			}
+			else{
+				info[numSteps].hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+			}
+		}
+
+		++numSteps;
+
+		token += strlen(token) + 1;
+	}
+
+	// debugging
+	debugMsg ( "Init complete.\n" );
+	debugMsg ( "# =input== =output= ==type== ===details===\n" );
+	for( int i=0; i<numSteps; ++i ){
+		info[i].i = i;
+		if( info[i].fIsWorkerThread )
+			debugMsg ( "%1x %08x %08x  THREAD  %s%s\n", i, info[i].hInput, info[i].hOutput, (info[i].fInputIsNamed ? "Named Pipe" : ""), (info[i].fOutputIsSocket ? "Output Socket" : ""));
+		else
+			debugMsg ( "%1x %08x %08x  PROCESS %s\n" ,i, info[i].hInput, info[i].hOutput, info[i].pBuff );
+	}
 	
-		ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
+	// turn on the pumps
+	for( int i = 0; i < numSteps; ++i ){
+		if( info[i].fIsWorkerThread )
+		{
+			info[i].pBuff = (char *)malloc(BUFFER_SIZE);
+			if( info[i].pBuff == NULL) {
+				stderrMsg ( "malloc failed for step %d \n",i);
+				ret = -1;
+				goto tidy;
+			}
 
-		ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
-		siStartInfo.cb = sizeof(STARTUPINFO); 
-		siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-		siStartInfo.hStdOutput = hOutput;
-		siStartInfo.hStdInput = hInput;
-		siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+			hChild[i] = (HANDLE)_beginthreadex(NULL, 0, &MoveDataThreadProc, &info[i], 0, NULL);
+			if( hChild[i] ) 
+			{
+				if (!SetThreadPriority( hChild[i], THREAD_PRIORITY_TIME_CRITICAL)) {
+					stderrMsg ( "Error changing thread priority for step %d : %d\n",i, GetLastError());
+					ret = -1;
+					goto tidy;
+				}
 
-		BOOL bFuncRetn; 
-		bFuncRetn = CreateProcess(NULL, 
-								  (i == 0 && bUseNamedPipe) ? lpszCmdWithPipe : token,   // command line 
+			}
+		}
+	}
+
+	// and turn on the taps
+	for( int i = 0; i < numSteps; ++i ){
+		if( !info[i].fIsWorkerThread )
+		{
+			STARTUPINFO siStartInfo;
+			PROCESS_INFORMATION piProcInfo; 
+	
+			ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
+			ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
+
+			siStartInfo.cb = sizeof(STARTUPINFO); 
+			siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+			siStartInfo.hStdInput = info[i].hInput;
+			siStartInfo.hStdOutput = info[i].hOutput;
+			siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+			if( !CreateProcess(NULL, info[i].pBuff,
 								  NULL, // process security attributes 
 								  NULL, // primary thread security attributes 
 								  TRUE, // handles are inherited 
@@ -308,90 +532,77 @@ DWORD main(int argc, char **argv)
 								  NULL, // use parent's environment 
 								  NULL, // use parent's current directory 
 								  &siStartInfo,  // STARTUPINFO pointer 
-								  &piProcInfo);  // receives PROCESS_INFORMATION 
-		if (bFuncRetn == 0) {
-			fprintf(stderr, "SW: Error creating child process: %d\n", GetLastError());
-			KillAllProcesses(pProcessHandles, numProcesses);
-			return -1;
+								  &piProcInfo)) {  // receives PROCESS_INFORMATION 
+				stderrMsg ( "Error Creating Process for step %d: %d\n", i, GetLastError());
+				ret = -1;
+				goto tidy;
+			}
+		
+			hChild[i] = piProcInfo.hProcess;
+			CloseHandle( piProcInfo.hThread );
+			CloseHandle(info[i].hOutput);
 		}
-		if (bDebug)
-			fprintf(stderr, "SW: Created child process with command line: %s\n", (i == 0 && bUseNamedPipe) ? lpszCmdWithPipe : token );
+	}
 
-		pProcessHandles[i] = piProcInfo.hProcess;
-		pThreadHandles[i] = piProcInfo.hThread;
+	bool fDie = false;
+	DWORD deadstep = -1;
 
-		// Skip over null and leading space
-		token += strlen(token) + 2;
-	}		
-	
-	if (bUseNamedPipe) {
-		// Socketwrapper has to transfer data from the named pipe to the next process in the command chain
-		if (numProcesses == 1) {
-			HANDLE hWRWriter = (outputSocketDup == INVALID_HANDLE_VALUE) ? GetStdHandle(STD_OUTPUT_HANDLE) : outputSocketDup;
+	while( !fDie )	{
+		DWORD wr = WaitForMultipleObjects( numSteps, hChild, FALSE, bDebug ? DEBUG_TIMEOUT : TIMEOUT );
+		if( wr!=WAIT_TIMEOUT ) {
+			deadstep = wr-WAIT_OBJECT_0;
+			stderrMsg( "Timeout Process/Thread for step %i died.\n", deadstep );
+			fDie = true;
 		}
-		VOID *pTransferBuffer = malloc(BUFFER_SIZE);
-		if (pTransferBuffer) {
-			// Create thread to transfer data from NPIPE to second command
-			PHANDLE hMoveThread = (PHANDLE)_beginthreadex(NULL, 0, &MoveData, pTransferBuffer, 0, NULL);
-			if (hMoveThread) {
-				SetThreadPriority(hMoveThread, THREAD_PRIORITY_TIME_CRITICAL);
-				// Monitor thread and other processes for exit or no data moved by thread in TIMEOUT
-				pProcessHandles[numProcesses] = hMoveThread; // add thread to array of processes which is monitored
-				DWORD timeOut = bDebug ? DEBUG_TIMEOUT : TIMEOUT;
-				UINT lastWDCount = 0;
-				while ((WaitForMultipleObjects(numProcesses+1, pProcessHandles, FALSE, timeOut) == WAIT_TIMEOUT)
-					   && (lastWDCount != watchDogCount))
-					lastWDCount = watchDogCount;
-				if (bDebug && (lastWDCount == watchDogCount))
-					fprintf(stderr, "SW: Transfer stalled            \n");
-				// Kill thread if still running
-				DWORD ThreadStatus;
-				GetExitCodeThread(hMoveThread, &ThreadStatus );
-				if (ThreadStatus == STILL_ACTIVE) {
-					if (bDebug)
-						fprintf(stderr, "SW: Killing MoveData thread\n");
-					TerminateThread(hMoveThread, 0);
+		for( int i=0; i<numSteps; ++i ){
+			if( info[i].fIsWorkerThread ){
+				if( 0==info[i].WatchDog ) {
+					stderrMsg( "Watchdog expired - Thread for step %i stalled.\n", i );
+					if (bWatchdogEnabled)	fDie = true;
 				}
-				CloseHandle(hMoveThread);
+				info[i].WatchDog=0;
 			}
-			else {
-				fprintf(stderr, "SW: Error creating thread to move data\n");
+		}
+	}
+
+tidy:
+	DWORD wr;
+
+	debugMsg ( "Tidying up \n"); 
+	if (deadstep == 0) {
+		debugMsg ( " Normal source all read: Process 0 ended \n" );
+	} else {
+		if (deadstep != -1) debugMsg ( " Process/thread %d stopped\n", deadstep );
+		if (fDie) debugMsg ( "Watchdog expired \n"); 
+	}
+	for( int i = 0; i < numSteps; ++i ){
+		if( info[i].fIsWorkerThread ){
+				wr = WaitForSingleObject( hChild[i],2000 );
+				if( wr==WAIT_TIMEOUT ) {
+					stderrMsg( "Tidying up - Thread for step %d hasn't died.\n", i );
+				}
+				if( wr==WAIT_FAILED ) {
+					stderrMsg ( "Tidying up - Wait for thread to die failed for step  %d: %d\n", i, GetLastError());
+				}
+			debugMsg("Thread for step %i streamed %6i blocks totalling %08X (%d) bytes\n",i, info[i].nBlocks , info[i].nBytes, info[i].nBytes );
+			} else {
+			debugMsg("Waiting for process step %i to terminate\n",i);
+			wr = WaitForSingleObject( hChild[i], 2000 );
+			if( wr==WAIT_TIMEOUT || wr==WAIT_FAILED ) {
+				stderrMsg( "Tidying up - process for step %d hasn't died or wait failed. wr=%d :%d \n", i,wr, GetLastError() );
+				if( hChild[i] ) {
+					if (!TerminateProcess( hChild[i], 0 ) )
+						stderrMsg ( "Error Terminating Process for step %d: %d\n", i, GetLastError());
+				}
 			}
-			free(pTransferBuffer);
 		}
-		else {
-			fprintf(stderr, "SW: Error allocating memory for transfer buffer\n");
-		}
-		// Clean up 
-		DisconnectNamedPipe(hRWReader);
-		CloseHandle(hRWReader);
-	}
-	else {
-		// Wait until at least one process dies
-		WaitForMultipleObjects(numProcesses, pProcessHandles, FALSE, INFINITE);
+		if( info[i].pBuff ) free( info[i].pBuff );
 	}
 
-	KillAllProcesses(pProcessHandles, numProcesses);
-	for (int i = 0; i < numProcesses; i++) {
-		CloseHandle(pThreadHandles[i]);
-	}
-	delete [] pProcessHandles;
-	delete [] pThreadHandles;
-	free(lpszCmdBuf);
-	free(lpszCmdWithPipe);
-	free(lpszPipeName);
 
-	if (inputSocket != INVALID_SOCKET) {
-		closesocket(inputSocket);
-		CloseHandle(inputSocketDup);
-	}
-
-	if (outputSocket != INVALID_SOCKET) { 
-		closesocket(inputSocket);
-		CloseHandle(inputSocketDup);
-	}
-
-	WSACleanup();
-
+	if( outputSocket ) closesocket( outputSocket );
+	if( inputSocket )  closesocket( inputSocket );
+	debugMsg("Socketwrapper has terminated.\n\n");
+	FlushFileBuffers(GetStdHandle(STD_OUTPUT_HANDLE));
 	return 0;
 }
