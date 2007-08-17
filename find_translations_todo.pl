@@ -2,22 +2,23 @@
 
 ## find_translations_todo.pl
 #
-# a. searches through any directories given on the command line (defaults to .)
+# a. searches through any directories given on the command line with --dirs flag (defaults to .)
 # b. finds all occurrences of files that end in strings.txt (thus, also picks up global_strings.txt)
-# c. reads through each strings file and determines whether all supported locales (given by @supported_langs variable) have been translated
+# c. reads through each strings file and determines whether all supported locales (given by --langs flag or defaults to @default_supported_langs array) have been translated
 # d. outputs to STDOUT all strings needed for translation and what locales currently exist for it
 #
 ## first version: bklaas 08.07
 
 use strict;
 use File::Find;
+use Getopt::Long;
 
-my @supported_langs = qw/ EN DE ES IT FR NL /;
-my @sorted_supports = sort @supported_langs;
-my %supported_langs = map { $_ } @supported_langs;
+my @default_supported_langs = qw/ EN DE ES IT FR NL /;
+my $command_args    = command_args();
+my $supported_langs = $command_args->{'langs'};
+my $dirs            = $command_args->{'dirs'};
 
-my @dirs = @ARGV ;
-@dirs = ( '.' ) unless $ARGV[0];
+my %supported_langs = map { $_ => '1' } @$supported_langs;
 
 my $strings_files = get_strings_files();
 
@@ -79,6 +80,38 @@ sub get_strings_files {
 	find sub {
 		my $file = $File::Find::name;
 		push @return, $file if $file =~ /strings\.txt$/;
-	}, @dirs;
+	}, @$dirs;
 	return \@return;
+}
+
+sub command_args {
+	my %args;
+	my $usage = "usage: find_translations_todo.pl (--dirs '...') (--langs '...')
+	argument to --dirs is a list of dirs to search 
+		(defaults to '.')
+	argument to --langs is a list of languages to check for translation 
+		(defaults to @default_supported_langs)\n";
+	GetOptions(
+		'help'	=>	\$args{'help'},
+		'dirs=s'	=>	\$args{'dirstring'},
+		'langs=s'	=>	\$args{'langstring'},
+	);
+	if ($args{'help'}) {
+		print $usage;
+		exit;
+	}
+	# parse dirs by spaces 
+	my @dirs = ( '.' );
+	if ($args{'dirstring'}) {
+		@dirs = split/\s+/, $args{'dirstring'};
+	}
+	$args{'dirs'} = \@dirs;
+
+	my @langs = @default_supported_langs;
+	if ($args{'langstring'}) {
+		@langs = split/[^A-Z]+/, $args{'langstring'};
+	}
+	$args{'langs'} = \@langs;
+
+	return \%args;
 }
