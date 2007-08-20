@@ -27,6 +27,7 @@ for my $string_file (@$strings_files) {
 	my $slurp = 0;
 	my %got_it; my @strings;
 	open(STRINGS,"<$string_file") or die "$!";
+	my $output;
 	while(<STRINGS>) {
 		chomp;
 		s/[\t\s]+$//;
@@ -34,7 +35,7 @@ for my $string_file (@$strings_files) {
 		if (/^[A-Z0-9]/) {
 			# first deal with the last slurp
 			if ($slurp) {
-				compare_hashes(\%got_it, $slurp, \@strings);
+				$output .= compare_hashes(\%got_it, $slurp, \@strings);
 			}
 			$slurp = $_;
 			%got_it = (); @strings = ();
@@ -49,21 +50,27 @@ for my $string_file (@$strings_files) {
 		}
 	}
 	if ($slurp) {
-		compare_hashes(\%got_it, $slurp, \@strings);
+		$output .= compare_hashes(\%got_it, $slurp, \@strings);
 	}
 	close(STRINGS);
+	if ($output) {
+		print "FILE:\t" . $string_file . "\n" if $command_args->{'verbose'};
+		print $output;
+	}
 }
 
 sub compare_hashes {
 	my ($seen, $string, $strings) = @_;
 	my $missing_translations = missing_translations($seen);
+	my $return = "";
 	if ($missing_translations) {
-		print "$string\n";
+		$return .= "$string\n";
 		for my $line (@$strings) {
-			print "\t$line->{'lang'}\t$line->{'string'}\n";
+			$return.= "\t$line->{'lang'}\t$line->{'string'}\n";
 		}
-		print "\n";
+		$return .= "\n";
 	}
+	return $return;
 }
 
 sub missing_translations {
@@ -86,7 +93,8 @@ sub get_strings_files {
 
 sub command_args {
 	my %args;
-	my $usage = "usage: find_translations_todo.pl (--dirs '...') (--langs '...')
+	my $usage = "usage: find_translations_todo.pl (--verbose) (--dirs '...') (--langs '...')
+	--verbose prints file information on each line
 	argument to --dirs is a list of dirs to search 
 		(defaults to '.')
 	argument to --langs is a list of languages to check for translation 
@@ -95,6 +103,7 @@ sub command_args {
 		'help'	=>	\$args{'help'},
 		'dirs=s'	=>	\$args{'dirstring'},
 		'langs=s'	=>	\$args{'langstring'},
+		'verbose'	=>	\$args{'verbose'},
 	);
 	if ($args{'help'}) {
 		print $usage;
