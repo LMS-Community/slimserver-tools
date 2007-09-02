@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<Root>
+[%- FOR file IN data.files %]
+	[%- IF data.usefile.$file.$target %]
+	<File RelativePath="[% file %]">
+	[%- FOR string IN data.data.$file.keys %]
+		[%- UNLESS data.data.$file.$string.$target %]
+		<string id = "[% string %]">
+			<Source>[% data.data.$file.$string.EN %]</Source>
+			<Target>[% data.data.$file.$string.$target %]</Target>
+		</string>[% END %]
+	[%- END %]
+	</File>
+	[%- END %]
+[% END -%]
+</Root>

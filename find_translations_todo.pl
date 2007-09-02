@@ -12,102 +12,80 @@
 use strict;
 use File::Find;
 use Getopt::Long;
+use Template;
 
 my @default_supported_langs = qw/ EN DE ES IT FR NL /;
-my $command_args    = command_args();
-my $xml_template    = get_xml_template();
-my $supported_langs = $command_args->{'langs'};
-my $dirs            = $command_args->{'dirs'};
+my $args            = command_args();
+my $supported_langs = $args->{'langs'};
+my $dirs            = $args->{'dirs'};
 
 my %supported_langs = map { $_ => '1' } @$supported_langs;
 
+my %DATA;
 my $strings_files = get_strings_files();
+$DATA{'files'} = $strings_files;
+$DATA{'langs'} = $supported_langs;
 
-my @strings_to_translate;
-
-print $xml_template->{'root_header'} if $command_args->{'format'} eq 'xml';
+my %found;
+my %missing;
 
 for my $string_file (@$strings_files) {
-	my $slurp = 0;
-	my %got_it; my @strings;
 	open(STRINGS,"<$string_file") or die "$!";
-	my $output;
+	my $string;
+	my %string_count = %supported_langs;
+	my %translation_count = %supported_langs;
 	while(<STRINGS>) {
-		chomp;
-		s/[\t\s]+$//;
-		next unless /^[\t\s]*[A-Z0-9]/;
+
+		# remove newline chars and trailing tabs/spaces
+		chomp; s/[\t\s]+$//; 
+
+		# skip all lines that don't start with a number/capital letter 
+		# or zero or more tabs/spaces, followed by a number/capital letter
+		next unless /^[\t\s]*[A-Z0-9]/; 
+
+		# this is a STRING
 		if (/^[A-Z0-9]/) {
-			# first deal with the last slurp
-			if ($slurp) {
-				$output .= compare_hashes(\%got_it, $slurp, \@strings);
+			$string = $_;
+			# add {FILE}{STRING} to %DATA, with blanks for all supported langs
+			for my $lang (@$supported_langs) {
+				$DATA{'data'}{$string_file}{$string}{$lang} = "";
+				map { $missing{$_}++ } @$supported_langs;
+				$string_count{$lang}++;
 			}
-			$slurp = $_;
-			%got_it = (); @strings = ();
-			next;
+		# this is a TRANSLATION
+		} elsif ($string ne "" && /^[\t\s]+[A-Z][A-Z]/) {
+			s/^[\t|\s]+//;
+			my ($lang, @translation) = split /[\t|\s]+/;
+			my $translation = join(' ', @translation);
+			#my ($lang, $translation) = /[\t|\s]*(A-ZA-Z)[\t\s]+(.*)/;
+			$DATA{'data'}{$string_file}{$string}{$lang} = $translation;
+			$found{$lang}++;
+			$translation_count{$lang}++;
 		}
-		if ($slurp && /^[\t\s]+[A-Z][A-Z]/) {
-			s/^[\t\s]+//;
-			my %data;
-			($data{'lang'}, $data{'string'}) = split /\t/;	
-			$got_it{$data{'lang'}}++;
-			push @strings, \%data;
-		}
-	}
-	if ($slurp) {
-		$output .= compare_hashes(\%got_it, $slurp, \@strings);
 	}
 	close(STRINGS);
-	if ($output) {
-		if ($command_args->{'format'} eq 'xml') {
-			my $filepath_header = $xml_template->{'filepath_header'};
-			$filepath_header =~ s/__FILEPATH/$string_file/g;
-			print $filepath_header;
-			print $output;
-			print $xml_template->{'filepath_footer'};
-		} else {
-			print "FILE:\t" . $string_file . "\n" if $command_args->{'verbose'};
-			print $output;
+	for my $lang (@$supported_langs) {
+		$DATA{'usefile'}{$string_file}{$lang}++ if $string_count{$lang} > $translation_count{$lang};
+	}
+}
+
+
+	if ($args->{'format'} eq 'xml') {
+		for my $LANG (@$supported_langs) {
+			next if $found{$LANG} == $missing{$LANG};
+			my $template = 'strings.' . $args->{'format'} . '.tmpl';
+			my $outfile  = "strings." . $LANG . "." . $args->{'format'};
+			my $tt = Template->new;
+			$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
 		}
+	} else {
+		my $template = 'strings.' . $args->{'format'} . '.tmpl';
+		my $outfile  = "strings." . $args->{'format'};
+		my $tt = Template->new;
+		$tt->process($template, { data => \%DATA }, $outfile) || die $tt->error;
 	}
-}
 
-print $xml_template->{'root_footer'} if $command_args->{'format'} eq 'xml';
-
-sub compare_hashes {
-	my ($seen, $string, $strings) = @_;
-	my $missing_translations = missing_translations($seen);
-	my $return = "";
-	if ($missing_translations) {
-		if ($command_args->{'format'} eq 'xml') {
-			my $string_header = $xml_template->{'string_header'};
-			$string_header =~ s/__STRING/$string/;
-			$return .= $string_header;
-			for my $line (@$strings) {
-				my $string_data = $xml_template->{'string_data'};
-				$string_data =~ s/__LANG/$line->{'lang'}/;
-				$string_data =~ s/__TRANSLATION/$line->{'string'}/;
-				$return .= $string_data;
-			}
-			$return .= $xml_template->{'string_footer'};
-		} else {
-			$return .= "$string\n";
-			for my $line (@$strings) {
-				$return.= "\t$line->{'lang'}\t$line->{'string'}\n";
-			}
-			$return .= "\n";
-		}
-	}
-	return $return;
-}
-
-sub missing_translations {
-	my $compare = shift;
-	my $missing = 0;
-	for (keys %supported_langs) {
-		$missing++ unless exists $compare->{$_};
-	}
-	return $missing;
-}
+exit 1;
 
 sub get_strings_files {
 	my @return;
@@ -154,26 +132,4 @@ sub command_args {
 	$args{'langs'} = \@langs;
 
 	return \%args;
-}
-
-sub get_xml_template {
-	my %return;
-	$return{'root_header'} = <<XMLHEAD;
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-	<Root>
-XMLHEAD
-	$return{'filepath_header'} = <<FILEPATH;
-		<File RelativePath="__FILEPATH">
-FILEPATH
-	$return{'filepath_footer'} = "\t\t</File>\n";
-
-	$return{'string_header'} = <<XMLSTRING;
-			<TranslationUnit Id="__STRING">
-XMLSTRING
-	$return{'string_footer'} = "\t\t\t</TranslationUnit>\n";
-	$return{'string_data'} = <<STRINGDATA;
-				<Target Language = "__LANG">__TRANSLATION</Target>
-STRINGDATA
-	$return{'root_footer'} = "\t</Root>\n";
-	return \%return;
 }
