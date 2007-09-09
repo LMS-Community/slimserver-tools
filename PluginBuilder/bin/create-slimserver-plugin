@@ -211,7 +211,10 @@ sub generateZipFile {
 	my $plugin  = shift;
 
 	my $zipFile = join('.', $plugin->{'module'}, 'zip');
-        $zipFile =~ s/::/-/g;
+	$zipFile =~ s/::/-/g;
+
+	my $pluginDir = $plugin->{'module'};
+	$pluginDir =~ s/(Plugins?|:)//g;
 
 	if (-f $zipFile) {
 
@@ -220,22 +223,22 @@ sub generateZipFile {
 		unlink($zipFile) or die "Couldn't remove [$zipFile] - $!\n";
 	}
 
-	print "- About to write out zipFile: [$zipFile] from $baseDir\n\n";
+	print "- About to write out zipFile: [$zipFile] from $baseDir with destination folder [$pluginDir]\n\n";
 
 	my $zip = Archive::Zip->new;
 
-	$zip->addTreeMatching($baseDir, undef, '\.par$');
-	$zip->addTreeMatching($baseDir, undef, '\.xml$');
-	$zip->addTreeMatching($baseDir, undef, '\.js$');
-	$zip->addTreeMatching($baseDir, undef, '\.html?$');
-	$zip->addTreeMatching($baseDir, undef, '\.css$');
-	$zip->addTreeMatching($baseDir, undef, '\.jpe?g$');
-	$zip->addTreeMatching($baseDir, undef, '\.gif$');
-	$zip->addTreeMatching($baseDir, undef, '\.png$');
-	$zip->addTreeMatching($baseDir, undef, '\.bmp$');
-	$zip->addTreeMatching($baseDir, undef, '\.txt$');
-	$zip->addTreeMatching($baseDir, undef, '\.conf$');
-	$zip->addTreeMatching($baseDir, undef, '\bbin\b');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.par$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.xml$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.js$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.html?$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.css$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.jpe?g$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.gif$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.png$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.bmp$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.txt$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.conf$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\bbin\b');
 
 	my $status = $zip->writeToFileNamed($zipFile);
 
