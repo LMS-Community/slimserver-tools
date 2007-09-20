@@ -66,12 +66,21 @@
 // ++++++
 // Version 1.8
 // Fix Lame truncation problem.
+//
+// ++++++
+// Version 1.9
+// Fix occasional crashes when closing down. bug #5128
+//
+// ++++++
+// Version 1.10
+// Fix thread CPU hog when input stream is closed - when EOF detected close thread. bug #5164
+
 
 #include <process.h>
 #include "stdafx.h"
 #include "getopt.h"
 
-#define	 SW_ID			  "Socketwrapper 1.8\n"
+#define	 SW_ID			  "Socketwrapper 1.10\n"
 
 // defines & global vars for extra thread mode
 #define  MAX_STEPS        16
@@ -114,38 +123,49 @@ printUsage() {
 	);
 }
 
-
+#define STRINGLEN 512
+#define STAMPEDMSGLEN (STRINGLEN+32)
 void 
 stderrMsg ( const char *fmt, ...) {
-
-        SYSTEMTIME st;
+	    SYSTEMTIME st;
 		va_list ap;
-        GetLocalTime(&st);
-        fprintf(stderr, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d ", 
-                   st.wYear, st.wMonth,  st.wDay, st.wHour, 
-                   st.wMinute, st.wSecond, st.wMilliseconds);
+		char str[STRINGLEN];
+		char stampedmsg[STAMPEDMSGLEN];
+
+		GetLocalTime(&st);
+
 		va_start(ap,fmt);
-		vfprintf(stderr, fmt, ap);
+		vsnprintf_s(str,STRINGLEN,_TRUNCATE, fmt, ap);
 		va_end(ap);
 
-	fflush(stderr);
+		_snprintf_s(stampedmsg,STAMPEDMSGLEN,_TRUNCATE, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d %s", 
+                   st.wYear, st.wMonth,  st.wDay, st.wHour, 
+                   st.wMinute, st.wSecond, st.wMilliseconds,str);
+
+        fputs(stampedmsg,stderr);
+		fflush(stderr);
 }
 
 void 
 debugMsg ( const char *fmt, ...) {
-	va_list ap;
     SYSTEMTIME st;
-	char errmsg[256];
+	va_list ap;
+
+	char str[STRINGLEN];
+	char stampedmsg[STAMPEDMSGLEN];
 
 	if (bDebug){
         GetLocalTime(&st);
-        fprintf(stderr, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d ", 
-                   st.wYear, st.wMonth,  st.wDay, st.wHour, 
-                   st.wMinute, st.wSecond, st.wMilliseconds);
 
-		va_start(ap,fmt);
-        vfprintf(stderr, fmt, ap);
+        va_start(ap,fmt);
+		vsnprintf_s(str,STRINGLEN,_TRUNCATE, fmt, ap);
 		va_end(ap);
+
+		_snprintf_s(stampedmsg,STAMPEDMSGLEN,_TRUNCATE, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d %s", 
+                   st.wYear, st.wMonth,  st.wDay, st.wHour, 
+                   st.wMinute, st.wSecond, st.wMilliseconds,str);
+
+        fputs(stampedmsg,stderr);
 		fflush(stderr);
 
 	}
@@ -192,6 +212,15 @@ unsigned __stdcall MoveDataThreadProc(void *pv)
 			stderrMsg ( "MoveDataThreadProc for step %i failed reading with error %i.\n", pS->i, GetLastError() );
 			break;
 		}
+		if (bytesread == 0) {
+			DWORD lasterror = GetLastError();
+			stderrMsg ( "MoveDataThreadProc for step %i read returned 0 bytes with no error. Last Error = %i.\n", pS->i, lasterror );
+			if (lasterror != 0) break;
+		// So no error and 0 bytes this means EOF so terminate the thread. 
+			break;
+
+		}
+
 
 		pS->nBytes += bytesread;
 		pS->nBlocks++;
@@ -229,11 +258,17 @@ unsigned __stdcall MoveDataThreadProc(void *pv)
 
 
 	debugMsg ( "MoveDataThreadProc for step %i ending.\n", pS->i );
-	if (!FlushFileBuffers(pS->hOutput)) {
+	if (!pS->fOutputIsSocket) {
+		if (!FlushFileBuffers(pS->hOutput)) {
 			stderrMsg ( "Error Flushing Output in Thread for step %d: %d\n", pS->i, GetLastError());
-			Sleep(250);
+		} 
+	} else {
+		shutdown((SOCKET) pS->hOutput, SD_SEND);
 	}
-	CloseHandle(pS->hOutput );
+	if(!CloseHandle(pS->hOutput )) {
+		stderrMsg ( "CloseHandle for step %i failed with error %i.\n", pS->i, GetLastError() );
+	}
+ 
 	_endthreadex(0); 
 	return 0;
 }
@@ -519,6 +554,7 @@ DWORD main(int argc, char **argv)
 			ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
 
 			siStartInfo.cb = sizeof(STARTUPINFO); 
+
 			siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 			siStartInfo.hStdInput = info[i].hInput;
 			siStartInfo.hStdOutput = info[i].hOutput;
@@ -540,7 +576,8 @@ DWORD main(int argc, char **argv)
 		
 			hChild[i] = piProcInfo.hProcess;
 			CloseHandle( piProcInfo.hThread );
-			CloseHandle(info[i].hOutput);
+			if (info[i].hOutput != GetStdHandle(STD_ERROR_HANDLE))
+				CloseHandle(info[i].hOutput);
 		}
 	}
 
@@ -577,14 +614,17 @@ tidy:
 	}
 	for( int i = 0; i < numSteps; ++i ){
 		if( info[i].fIsWorkerThread ){
-				wr = WaitForSingleObject( hChild[i],2000 );
+				if (bWatchdogEnabled)
+					wr = WaitForSingleObject( hChild[i],2000 );
+				else 
+					wr = WaitForSingleObject( hChild[i],INFINITE );
+
 				if( wr==WAIT_TIMEOUT ) {
 					stderrMsg( "Tidying up - Thread for step %d hasn't died.\n", i );
-				}
-				if( wr==WAIT_FAILED ) {
+				} else if( wr==WAIT_FAILED ) {
 					stderrMsg ( "Tidying up - Wait for thread to die failed for step  %d: %d\n", i, GetLastError());
 				}
-			debugMsg("Thread for step %i streamed %6i blocks totalling %08X (%d) bytes\n",i, info[i].nBlocks , info[i].nBytes, info[i].nBytes );
+				debugMsg("Thread for step %i streamed %6i blocks totalling %08X (%d) bytes\n",i, info[i].nBlocks , info[i].nBytes, info[i].nBytes );
 			} else {
 			debugMsg("Waiting for process step %i to terminate\n",i);
 			wr = WaitForSingleObject( hChild[i], 2000 );
@@ -599,10 +639,30 @@ tidy:
 		if( info[i].pBuff ) free( info[i].pBuff );
 	}
 
+//
+//  Now that all processes are terminated - check if any threads are still running and end them as well.
+//
+
+	for( int i = 0; i < numSteps; ++i ){
+		if( info[i].fIsWorkerThread ){
+			DWORD threadExitCode;
+			if (GetExitCodeThread(hChild[i],&threadExitCode)) {
+				if (threadExitCode == STILL_ACTIVE){
+					debugMsg("Exitcode for Thread %i Code=%d\n",i,threadExitCode);
+					if(!TerminateThread(hChild[i], 2)) {
+						stderrMsg ( "Error trying to TerminateThread for step %d: %d\n", i, GetLastError());
+					}
+				}
+			} else {
+				stderrMsg ( "Error GetExitThreadCode for step %d: %d\n", i, GetLastError());
+			}
+			CloseHandle(hChild[i]); // CloseHandle is required because _beginthreadex was used.
+		}
+	}
 
 	if( outputSocket ) closesocket( outputSocket );
 	if( inputSocket )  closesocket( inputSocket );
-	debugMsg("Socketwrapper has terminated.\n\n");
 	FlushFileBuffers(GetStdHandle(STD_OUTPUT_HANDLE));
+	debugMsg("Socketwrapper has terminated.\n\n");
 	return 0;
 }
