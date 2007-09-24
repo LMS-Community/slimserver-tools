@@ -237,6 +237,8 @@ sub generateZipFile {
 	$zip->addTreeMatching($baseDir, $pluginDir, '\.png$');
 	$zip->addTreeMatching($baseDir, $pluginDir, '\.bmp$');
 	$zip->addTreeMatching($baseDir, $pluginDir, '\.txt$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.sql$');
+	$zip->addTreeMatching($baseDir, $pluginDir, '\.template$');
 	$zip->addTreeMatching($baseDir, $pluginDir, '\.conf$');
 	$zip->addTreeMatching($baseDir, $pluginDir, '\bbin\b');
 
