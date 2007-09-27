@@ -1,4 +1,4 @@
-SlimServer Tools
+SqueezeCenter Tools
 
 This directory contains several scripts to work along with the slimserver software.
 

@@ -1,8 +1,8 @@
 
-* SlimServer Plugin Builder
+* SqueezeCenter Plugin Builder
 ======================================================================
 
-This tool allows you to build a SlimServer 7.0+ compatible plugin package.
+This tool allows you to build a SqueezeCenter 7.0+ compatible plugin package.
 
 The basic layout of a plugin is as follows:
 
@@ -22,7 +22,7 @@ which are referred to by install.xml:
 	convert.conf
 
 All files in the topdir/ will be bundled into a .zip file, which is then
-installable via the SlimServer Web Interface. A '.par' file will be created
+installable via the SqueezeCenter Web Interface. A '.par' file will be created
 from the perl modules in your lib/ path, which will pull in the appropriate
 dependencies.
 
@@ -39,7 +39,7 @@ Usage: ./bin/create-slimserver-plugin
 
 	--slimserverdir <dir>
 
-		This must point to the top level of your SlimServer directory. 
+		This must point to the top level of your SqueezeCenter directory. 
 
 COPYRIGHT AND LICENCE
 

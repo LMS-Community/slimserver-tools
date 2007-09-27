@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Dump the keys of SlimServer's FileCache to a text file
+# Dump the keys of SqueezeCenter's FileCache to a text file
 #
 
 $| = 1;
@@ -13,7 +13,7 @@ use File::Spec::Functions qw(catdir);
 use Storable qw(nfreeze);
 
 my $cacheDir = shift || die qq{
-Please specify the path to your SlimServer Cache directory.
+Please specify the path to your SqueezeCenter Cache directory.
 
 Examples: 
   Win: C:/Program Files/SlimServer/server/Cache
