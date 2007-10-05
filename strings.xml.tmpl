@@ -4,11 +4,10 @@
 	[%- IF data.usefile.$file.$target %]
 	<File path="[% file %]">
 	[%- FOR string IN data.data.$file.keys %]
-		[%- UNLESS data.data.$file.$string.$target %]
 		<TranslationUnit Id = "[% string %]">
 			<Source><![CDATA[[% data.data.$file.$string.EN %]]]></Source>
 			<Target>[% IF data.data.$file.$string.$target %]<![CDATA[[% data.data.$file.$string.$target %]]]>[% END %]</Target>
-		</TranslationUnit>[% END %]
+		</TranslationUnit>
 	[%- END %]
 	</File>
 	[%- END %]
