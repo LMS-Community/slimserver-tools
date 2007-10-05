@@ -6,8 +6,8 @@
 	[%- FOR string IN data.data.$file.keys %]
 		[%- UNLESS data.data.$file.$string.$target %]
 		<TranslationUnit Id = "[% string %]">
-			<Source>[% data.data.$file.$string.EN %]</Source>
-			<Target>[% data.data.$file.$string.$target %]</Target>
+			<Source><!CDATA[[[% data.data.$file.$string.EN %]]]></Source>
+			<Target>[% IF data.data.$file.$string.$target %]<!CDATA[[[% data.data.$file.$string.$target %]]]>[% END %]</Target>
 		</TranslationUnit>[% END %]
 	[%- END %]
 	</File>
