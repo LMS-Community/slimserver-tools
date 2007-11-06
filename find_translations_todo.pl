@@ -74,7 +74,8 @@ for my $string_file (@$strings_files) {
 		my $dir = "stringsFiles";
 		mkdir $dir unless -d $dir;
 		for my $LANG (@$supported_langs) {
-			next if $LANG eq 'EN';
+			# SLT team wants EN as well
+			#next if $LANG eq 'EN';
 			next if $found{$LANG} == $missing{$LANG};
 			my $template = 'strings.' . $args->{'format'} . '.tmpl';
 			my $outfile  = $dir . "/strings." . $LANG . "." . $args->{'format'};
