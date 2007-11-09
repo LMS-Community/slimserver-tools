@@ -70,7 +70,7 @@ for my $string_file (@$strings_files) {
 }
 
 
-	if ($args->{'format'} eq 'xml') {
+	if ($args->{'format'} =~ /(xml|slt)/) {
 		my $dir = "stringsFiles";
 		mkdir $dir unless -d $dir;
 		for my $LANG (@$supported_langs) {
@@ -79,7 +79,7 @@ for my $string_file (@$strings_files) {
 			next if $found{$LANG} == $missing{$LANG};
 			my $template = 'strings.' . $args->{'format'} . '.tmpl';
 			my $outfile  = $dir . "/strings." . $LANG . "." . $args->{'format'};
-			my $tt = Template->new;
+			my $tt = Template->new({ EVAL_PERL => 1 });
 			$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
 		}
 	} else {

@@ -1,0 +1,12 @@
+[%- FOR file IN data.files %]
+[%- PERL %]
+my $file = $stash->get('file');
+$file =~ /(\w*?)\/strings.txt$/;
+$stash->set( module => $1 );
+[%- END %]
+[%- FOR string IN data.data.$file.keys %]
+[%- IF data.data.$file.$string.$target %]
+[%- module _ '__' _ string %]	[% data.data.$file.$string.$target %]	
+[% END %]
+[%- END %]
+[%- END %]

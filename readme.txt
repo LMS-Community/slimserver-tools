@@ -59,3 +59,6 @@ This directory contains several scripts to work along with the slimserver softwa
 	whack.pl myplugin.pm...
 	This will rewrite myplugin.pm (and any other specified files), leaving
 	a copy of the script in myplugin.pm.old, to use the new module layout.
+
+-strings 
+	a few tools to extract/merge strings for localization by SLT
