@@ -65,7 +65,8 @@ for my $string_file (@$strings_files) {
 	}
 	close(STRINGS);
 	for my $lang (@$supported_langs) {
-		$DATA{'usefile'}{$string_file}{$lang}++ if $string_count{$lang} > $translation_count{$lang};
+		#$DATA{'usefile'}{$string_file}{$lang}++ if $string_count{$lang} > $translation_count{$lang};
+		$DATA{'usefile'}{$string_file}{$lang}++;
 	}
 }
 
@@ -79,6 +80,7 @@ for my $string_file (@$strings_files) {
 			next if $found{$LANG} == $missing{$LANG};
 			my $template = 'strings.' . $args->{'format'} . '.tmpl';
 			my $outfile  = $dir . "/strings." . $LANG . "." . $args->{'format'};
+			print "Creating $outfile\n";
 			my $tt = Template->new({ EVAL_PERL => 1 });
 			$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
 		}
@@ -102,7 +104,7 @@ sub get_strings_files {
 
 sub command_args {
 	my %args;
-	my $usage = "usage: find_translations_todo.pl (--verbose) (--format [xml|txt]) (--dirs '...') (--langs '...')
+	my $usage = "usage: find_translations_todo.pl (--verbose) (--format [xml|slt|txt]) (--dirs '...') (--langs '...')
 	--format defaults to txt. xml is the other option.
 	--verbose prints file information on each line
 	argument to --dirs is a list of dirs to search 
@@ -127,7 +129,7 @@ sub command_args {
 	}
 	$args{'dirs'} = \@dirs;
 
-	$args{'format'} eq 'txt' unless $args{'format'} eq 'xml';
+	$args{'format'} eq 'txt' unless $args{'format'};
 
 	my @langs = @default_supported_langs;
 	if ($args{'langstring'}) {

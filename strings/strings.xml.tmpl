@@ -5,8 +5,8 @@
 	<File path="[% file %]">
 	[%- FOR string IN data.data.$file.keys %]
 		<TranslationUnit Id = "[% string %]">
-			<Source><![CDATA[[% data.data.$file.$string.EN %]]]></Source>
-			<Target>[% IF data.data.$file.$string.$target %]<![CDATA[[% data.data.$file.$string.$target %]]]>[% END %]</Target>
+			<Source>[% data.data.$file.$string.EN %]</Source>[% IF target != 'EN' %]
+			<Target>[% data.data.$file.$string.$target %]</Target>[% END %]
 		</TranslationUnit>
 	[%- END %]
 	</File>
