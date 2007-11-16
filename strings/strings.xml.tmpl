@@ -5,8 +5,8 @@
 	<File path="[% file %]">
 	[%- FOR string IN data.data.$file.keys %]
 		<TranslationUnit Id = "[% string %]">
-			<Source>[% data.data.$file.$string.EN %]</Source>[% IF target != 'EN' %]
-			<Target>[% data.data.$file.$string.$target %]</Target>[% END %]
+			<Source>[% data.data.$file.$string.EN | html %]</Source>[% IF target != 'EN' %]
+			<Target>[% data.data.$file.$string.$target | html  %]</Target>[% END %]
 		</TranslationUnit>
 	[%- END %]
 	</File>
