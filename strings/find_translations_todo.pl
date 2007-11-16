@@ -32,64 +32,86 @@ my %missing;
 for my $string_file (@$strings_files) {
 	open(STRINGS,"<$string_file") or die "$!";
 	my $string;
-	my %string_count = %supported_langs;
-	my %translation_count = %supported_langs;
-	while(<STRINGS>) {
 
-		# remove newline chars and trailing tabs/spaces
-		chomp; s/[\t\s]+$//; 
-
-		# skip all lines that don't start with a number/capital letter 
-		# or zero or more tabs/spaces, followed by a number/capital letter
-		next unless /^[\t\s]*[A-Z0-9]/; 
-
-		# this is a STRING
-		if (/^[A-Z0-9]/) {
-			$string = $_;
-			# add {FILE}{STRING} to %DATA, with blanks for all supported langs
-			for my $lang (@$supported_langs) {
-				$DATA{'data'}{$string_file}{$string}{$lang} = "";
-				map { $missing{$_}++ } @$supported_langs;
-				$string_count{$lang}++;
+	if ($string_file =~ /\.txt$/i) {
+		while(<STRINGS>) {
+	
+			# remove newline chars and trailing tabs/spaces
+			chomp; s/[\t\s]+$//; 
+	
+			# skip all lines that don't start with a number/capital letter 
+			# or zero or more tabs/spaces, followed by a number/capital letter
+			next unless /^[\t\s]*[A-Z0-9]/; 
+	
+			# this is a STRING ID
+			if (/^[A-Z0-9]/) {
+				$string = $_;
+				# add {FILE}{STRING} to %DATA, with blanks for all supported langs
+				for my $lang (@$supported_langs) {
+					$DATA{'data'}{$string_file}{$string}{$lang} = "";
+					map { $missing{$_}++ } @$supported_langs;
+				}
 			}
-		# this is a TRANSLATION
-		} elsif ($string ne "" && /^[\t\s]+[A-Z][A-Z]/) {
-			s/^[\t|\s]+//;
-			my ($lang, @translation) = split /[\t|\s]+/;
-			my $translation = join(' ', @translation);
-			#my ($lang, $translation) = /[\t|\s]*(A-ZA-Z)[\t\s]+(.*)/;
-			$DATA{'data'}{$string_file}{$string}{$lang} = $translation;
-			$found{$lang}++;
-			$translation_count{$lang}++;
+	
+			# this is a TRANSLATION
+			elsif ($string ne "" && /^[\t\s]+[A-Z][A-Z]/) {
+				s/^[\t|\s]+//;
+				my ($lang, @translation) = split /[\t|\s]+/;
+				my $translation = join(' ', @translation);
+				$DATA{'data'}{$string_file}{$string}{$lang} = $translation;
+				$found{$lang}++;
+			}
 		}
 	}
+	elsif ($string_file =~ /\.iss/i) {
+		while(<STRINGS>) {
+	
+			# remove newline chars and trailing tabs/spaces
+			chomp; s/[\t\s]+$//; 
+
+			next unless /([a-z]{2})\.(\w+?)=(.*)/i;
+			(my $lang, my $string, my $translation) = (uc($1), $2, $3);
+
+			if (!$DATA{'data'}{$string_file}{$string}) {
+				# add {FILE}{STRING} to %DATA, with blanks for all supported langs
+				for my $lang (@$supported_langs) {
+					$DATA{'data'}{$string_file}{$string}{$lang} = "";
+					map { $missing{$_}++ } @$supported_langs;
+				}				
+			}
+
+			$DATA{'data'}{$string_file}{$string}{$lang} = $translation;
+
+			$found{$lang}++;
+		}		
+	}
+
 	close(STRINGS);
 	for my $lang (@$supported_langs) {
-		#$DATA{'usefile'}{$string_file}{$lang}++ if $string_count{$lang} > $translation_count{$lang};
 		$DATA{'usefile'}{$string_file}{$lang}++;
 	}
 }
 
 
-	if ($args->{'format'} =~ /(xml|slt)/) {
-		my $dir = "stringsFiles";
-		mkdir $dir unless -d $dir;
-		for my $LANG (@$supported_langs) {
-			# SLT team wants EN as well
-			#next if $LANG eq 'EN';
-			next if $found{$LANG} == $missing{$LANG};
-			my $template = 'strings.' . $args->{'format'} . '.tmpl';
-			my $outfile  = $dir . "/strings." . $LANG . "." . $args->{'format'};
-			print "Creating $outfile\n";
-			my $tt = Template->new({ EVAL_PERL => 1 });
-			$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
-		}
-	} else {
+if ($args->{'format'} =~ /(xml|slt)/) {
+	my $dir = "stringsFiles";
+	mkdir $dir unless -d $dir;
+	for my $LANG (@$supported_langs) {
+		# SLT team wants EN as well
+		#next if $LANG eq 'EN';
+		next if $found{$LANG} == $missing{$LANG};
 		my $template = 'strings.' . $args->{'format'} . '.tmpl';
-		my $outfile  = "strings." . $args->{'format'};
-		my $tt = Template->new;
-		$tt->process($template, { data => \%DATA }, $outfile) || die $tt->error;
+		my $outfile  = $dir . "/strings." . $LANG . "." . $args->{'format'};
+		print "Creating $outfile\n";
+		my $tt = Template->new({ EVAL_PERL => 1 });
+		$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
 	}
+} else {
+	my $template = 'strings.' . $args->{'format'} . '.tmpl';
+	my $outfile  = "strings." . $args->{'format'};
+	my $tt = Template->new;
+	$tt->process($template, { data => \%DATA }, $outfile) || die $tt->error;
+}
 
 exit 1;
 
@@ -97,7 +119,7 @@ sub get_strings_files {
 	my @return;
 	find sub {
 		my $file = $File::Find::name;
-		push @return, $file if $file =~ /strings\.txt$/;
+		push @return, $file if $file =~ /strings\.(txt|iss)$/;
 	}, @$dirs;
 	return \@return;
 }
