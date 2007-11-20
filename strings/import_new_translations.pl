@@ -42,23 +42,28 @@ $DATA{'langs'} = $supported_langs;
 my @strings_files = ();
 
 for my $lang (@$supported_langs) {
-	my $string_file = $args->{'infiles'} . "/strings." . $lang . ".xml";
+	my $string_file = $args->{'infiles'} . "/strings." . lc($lang) . ".xml";
 
 	# read XML file
+	print "$string_file\n";
 	my $raw = $xml->XMLin($string_file, ForceArray => 1 );
-	my $data = $raw->{'File'};
+	my $data = $raw->{'file'};
 	for my $elem (@$data) {
-		my $relPath = $elem->{'path'};
-		$relPath =~ s/\/+Users\/bklaas\/trunk\/jive\///;
+		my $relPath = $elem->{'original'};
+		$relPath =~ s/\/+Users\/bklaas\/jive\///;
 		my $fullpath = $args->{'rootpath'} . "/" . $relPath;
 		if (-e $fullpath) {
-			push @strings_files, $elem->{'path'};
-			my $ref = $elem->{'TranslationUnit'};
+			push @strings_files, $elem->{'original'};
+			my $ref = $elem->{'body'};
 
-			for my $stringData (@$ref) {
-				my $id = $stringData->{'Id'};
-				my $translation = $stringData->{'Target'}[0];
-				$STRINGS{$fullpath}{$id}{$lang} = $translation;
+			for my $fileTrans (@$ref) {
+				my $stringTrans = $fileTrans->{'trans-unit'};
+				for my $id (sort keys %$stringTrans) {
+					my $translation = $stringTrans->{$id}{'target'}->[0];
+					#print "|$translation|\n";
+					$STRINGS{$fullpath}{$id}{$lang} = $translation;
+					#print "$fullpath\t$id\t$lang\t$STRINGS{$fullpath}{$id}{$lang}\n";
+				}
 			}
 		}
 		
@@ -103,7 +108,7 @@ for my $string_file (@$strings_files) {
 		if (/^[A-Z0-9]/) {
 			$string = $_;
 			print OUT $_ . "\n";
-			for my $lang ('EN', @$supported_langs) {
+			for my $lang (sort 'EN', @$supported_langs) {
 				if ($already_translated->{$string_file}{$string}{$lang}) {
 					print OUT "\t" . $lang . "\t" . $already_translated->{$string_file}{$string}{$lang} . "\n";
 				} elsif ($STRINGS{$string_file}{$string}{$lang}) {
@@ -195,8 +200,8 @@ sub firstPass {
 		if (/^[A-Z0-9]/) {
 			$string = $_;
 		# this is a TRANSLATION
-		} elsif ($string ne "" && /^[\t\s]+[A-Z][A-Z]/) {
-			s/^[\t|\s]+//;
+		} elsif ($string ne "" && /^\t+[A-Z][A-Z]/) {
+			s/^\t+//;
 			my ($lang, @translation) = split /[\t|\s]+/;
 			my $translation = join(' ', @translation);
 			$return{$string_file}{$string}{$lang} = $translation;
