@@ -194,7 +194,7 @@ sub firstPass {
 
 		# skip all lines that don't start with a number/capital letter 
 		# or zero or more tabs/spaces, followed by a number/capital letter
-		next unless /^[\t\s]*[A-Z0-9]/; 
+		next unless /^\t*[A-Z0-9]/; 
 
 		# this is a STRING
 		if (/^[A-Z0-9]/) {
@@ -202,7 +202,7 @@ sub firstPass {
 		# this is a TRANSLATION
 		} elsif ($string ne "" && /^\t+[A-Z][A-Z]/) {
 			s/^\t+//;
-			my ($lang, @translation) = split /[\t|\s]+/;
+			my ($lang, @translation) = split /\t+/;
 			my $translation = join(' ', @translation);
 			$return{$string_file}{$string}{$lang} = $translation;
 		}
