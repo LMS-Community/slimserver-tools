@@ -28,7 +28,7 @@ use Encode;
 my $xml = new XML::Simple;
 
 
-my @default_supported_langs = qw/ DE ES IT FR NL /;
+my @default_supported_langs = sort qw/ DE ES FR HE IT NL /;
 my $args            = command_args();
 my $supported_langs = $args->{'langs'};
 my $rootpath        = $args->{'rootpath'};
@@ -46,12 +46,14 @@ for my $lang (@$supported_langs) {
 
 	# read XML file
 	print "$string_file\n";
+	next if (! -e $string_file);
 	my $raw = $xml->XMLin($string_file, ForceArray => 1 );
 	my $data = $raw->{'file'};
 	for my $elem (@$data) {
 		my $relPath = $elem->{'original'};
-		$relPath =~ s/\/+Users\/bklaas\/jive\///;
+#		$relPath =~ s/\/+Users\/bklaas\/jive\///;
 		my $fullpath = $args->{'rootpath'} . "/" . $relPath;
+	$fullpath = $relPath;
 		if (-e $fullpath) {
 			push @strings_files, $elem->{'original'};
 			my $ref = $elem->{'body'};
@@ -83,10 +85,31 @@ for my $string_file (@$strings_files) {
 	# pass 2: open a second file for writing, 
 	# filling in missing translations with whatever we have from XML files
 
-	# pass 1
-	my $already_translated = firstPass($string_file);
+	if ($string_file =~ /\.txt$/i) {
+		# pass 1
+		my $already_translated = readTxtFile($string_file);
 
-	# pass 2
+		# pass 2
+		writeTxtFile($already_translated, $string_file);		
+	}
+
+	# Windows installer file
+	elsif ($string_file =~ /\.iss$/i) {
+		# pass 1
+		my $already_translated = readIssFile($string_file);
+
+		# pass 2
+		writeIssFile($already_translated, $string_file);		
+	} 
+	
+
+	$i++;
+}
+exit 1;
+
+sub writeTxtFile {
+	my ($already_translated, $string_file) = @_;
+
 	open(IN,"<:utf8", $string_file) or die "$!";
 	open(OUT,'>:utf8', "${string_file}.new") or die "$!";
 	#open(OUT,">:utf8", "/tmp/test/strings$i.txt") or die "$!";
@@ -132,15 +155,55 @@ for my $string_file (@$strings_files) {
 	close(OUT);
 	unlink($string_file);	
 	rename("${string_file}.new", $string_file);
-	$i++;
 }
-exit 1;
+
+sub writeIssFile {
+	my ($already_translated, $string_file) = @_;
+
+	# do NOT use utf8 for Windows installer files 
+	open(IN, $string_file) or die "$! - $string_file";
+	open(OUT, ">${string_file}.new") or die "$! - $string_file";
+	my $string = '';
+
+	while(<IN>) {
+		# remove newline chars and trailing tabs/spaces
+		chomp; s/[\t\s]+$//; 
+
+		# this is a new STRING
+		if (/([a-z]{2})\.(\w+?)=(.*)/i) {
+			$string = $2;
+			for my $lang ('EN', @$supported_langs) {
+				if ($STRINGS{$string_file}{$string}{$lang}) {
+					# hack to deal with newline not showing up in translations
+					if ($lang ne 'EN' && $already_translated->{$string_file}{$string}{'EN'} =~ /^\\n/ && $STRINGS{$string_file}{$string}{$lang} !~ /^\\n/) {
+						$STRINGS{$string_file}{$string}{$lang} = '\n' . $STRINGS{$string_file}{$string}{$lang};
+					}
+					print OUT lc($lang) . '.' . $string . '=' . $STRINGS{$string_file}{$string}{$lang} . "\n";
+				}
+				elsif ($already_translated->{$string_file}{$string}{$lang}) {
+					print OUT lc($lang) . '.' . $string . '=' . $already_translated->{$string_file}{$string}{$lang} . "\n";
+				}
+			}
+			$STRINGS{$string_file}{$string} = undef;
+			$already_translated->{$string_file}{$string} = undef;
+			next;
+
+		# this is neither, so just print the raw line, unchanged
+		} else {
+			print OUT $_ . "\n";
+		}
+	}
+	close(IN);
+	close(OUT);
+	unlink($string_file);	
+	rename("${string_file}.new", $string_file);
+}
 
 sub get_strings_files {
 	my @return;
 	find sub {
 		my $file = $File::Find::name;
-		push @return, $file if $file =~ /strings\.txt$/;
+		push @return, $file if $file =~ /strings\.(txt|iss)$/;
 	}, $args->{'rootpath'};
 	return \@return;
 }
@@ -175,7 +238,7 @@ sub command_args {
 	return \%args;
 }
 
-sub firstPass {
+sub readTxtFile {
 	my $string_file = shift;
 	my %return;
 	open(STRINGS,"<:utf8", $string_file) or die "$!";
@@ -208,5 +271,34 @@ sub firstPass {
 		}
 	}
 	close(STRINGS);
+	return \%return;
+}
+
+sub readIssFile {
+	my $string_file = shift;
+	my %return;
+	open(STRINGS, $string_file) or die "$!";
+	my $string;
+	my $lineNumber = 0;
+	while(<STRINGS>) {
+
+		# remove newline chars and trailing tabs/spaces
+		chomp; s/[\t\s]+$//; 
+
+		next unless /([a-z]{2})\.(\w+?)=(.*)/i;
+		(my $lang, my $string, my $translation) = (uc($1), $2, $3);
+
+		if (!$DATA{'data'}{$string_file}{$string}) {
+			# add {FILE}{STRING} to %DATA, with blanks for all supported langs
+			for my $lang (@$supported_langs) {
+				$DATA{'data'}{$string_file}{$string}{$lang} = "";
+			}				
+		}
+
+		$return{$string_file}{$string}{$lang} = $translation;
+
+	}
+	close(STRINGS);
+
 	return \%return;
 }
