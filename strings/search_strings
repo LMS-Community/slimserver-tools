@@ -1,0 +1,38 @@
+#!/usr/bin/perl
+
+## search_strings
+#
+# a. from pwd directory, searches through all *strings.txt files and prints file and line where string matches
+## first version: bklaas 12.07
+
+use strict;
+use File::Find;
+
+my $dir = `pwd`;
+chomp($dir);
+my $string = shift;
+die "Need a string to search strings.txt files for" unless $string;
+
+my $strings_files = get_strings_files($dir);
+
+for my $string_file (@$strings_files) {
+	my $abbr_file = $string_file;
+	$abbr_file =~ s/$dir//;
+	open(STRINGS,"<$string_file") or die "$!";
+	while(<STRINGS>) {
+		print $abbr_file . ": " . $_ if /$string/;
+	}
+	close(STRINGS);
+}
+
+exit 1;
+
+sub get_strings_files {
+	my $dir = shift;
+	my @return;
+	find sub {
+		my $file = $File::Find::name;
+		push @return, $file if $file =~ /strings\.txt$/;
+	}, $dir;
+	return \@return;
+}
