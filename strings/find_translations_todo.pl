@@ -14,7 +14,7 @@ use File::Find;
 use Getopt::Long;
 use Template;
 
-my @default_supported_langs = qw/ EN DE ES IT FR NL /;
+my @default_supported_langs = qw/ EN DA DE ES FI IT FR NL NO SV /;
 my $args            = command_args();
 my $supported_langs = $args->{'langs'};
 my $dirs            = $args->{'dirs'};
@@ -56,9 +56,11 @@ for my $string_file (@$strings_files) {
 			# this is a TRANSLATION
 			elsif ($string ne "" && /^[\t\s]+[A-Z][A-Z]/) {
 				s/^[\t|\s]+//;
-				my ($lang, @translation) = split /[\t|\s]+/;
-				my $translation = join(' ', @translation);
-				$DATA{'data'}{$string_file}{$string}{$lang} = $translation;
+				my ($lang, @translation) = split /[\t]+/;
+#				my ($lang, @translation) = split /[\t|\s]+/;
+#				my $translation = join(" ", @translation);
+				$DATA{'data'}{$string_file}{$string}{$lang} = $translation[0];
+				$DATA{'comment'}{$string_file}{$string}{$lang} = $translation[1] if scalar(@translation) > 1;
 				$found{$lang}++;
 			}
 		}
