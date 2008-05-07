@@ -6,7 +6,7 @@ $stash->set( module => $1 );
 [%- END %]
 [%- FOR string IN data.data.$file.keys %]
 [%- IF data.data.$file.$string.$target %]
-[%- module _ '__' _ string %]	[% data.data.$file.$string.$target %]	
+[%- module _ '__' _ string %]	[% data.data.$file.$string.$target %]	[% data.comment.$file.$string.$target %]
 [% END %]
 [%- END %]
 [%- END %]
