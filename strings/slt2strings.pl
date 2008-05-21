@@ -88,9 +88,14 @@ find sub {
 
 # write file with unknown translations
 if (keys %strings) {
+	
 	my $stringsFile = catdir($tmpFolder, 'unknown-strings.txt');
+
+	print "Writing out unknown strings to $stringsFile\n" if ($debug);
+
 	open(STRINGS, ">:utf8", $stringsFile) or die "Couldn't open $stringsFile for writing: $!\n";
 	binmode STRINGS;
+
 	foreach my $stringName (sort keys %strings) {
 		print STRINGS "$stringName\n";
 
@@ -100,6 +105,7 @@ if (keys %strings) {
 
 		print STRINGS "\n";
 	}
+
 	close(STRINGS);
 }
 
@@ -182,15 +188,18 @@ sub sortStrings {
 
 sub getArgs {
 	my %args;
-	my $usage = "usage: slt2strings.pl (--langs '...') --dir '...'
+	my $usage = "usage: slt2strings.pl (--langs '...') (--quiet) --dir '...'
 	argument to --dir is the root folder of the directory tree we want to search for strings.txt files
 
 	argument to --langs is a list of languages to check for translation 
 		(defaults to @defaultLanguages)\n";
 
+	my $quiet;
+
 	GetOptions(
 		'help'      => \$args{'help'},
 		'langs=s'   => \$args{'langstring'},
+		'quiet'     => \$quiet,
 		'dir=s'     => \$args{'dir'},
 	);
 
@@ -204,6 +213,7 @@ sub getArgs {
 		@langs = split/[^A-Z]+/, $args{'langstring'};
 	}
 
+	$debug = !$quiet;
 	$args{'langs'} = \@langs;
 
 	return \%args;
