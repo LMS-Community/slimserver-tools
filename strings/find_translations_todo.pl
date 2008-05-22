@@ -57,8 +57,6 @@ for my $string_file (@$strings_files) {
 			elsif ($string ne "" && /^[\t\s]+[A-Z][A-Z]/) {
 				s/^[\t|\s]+//;
 				my ($lang, @translation) = split /[\t]+/;
-#				my ($lang, @translation) = split /[\t|\s]+/;
-#				my $translation = join(" ", @translation);
 				$DATA{'data'}{$string_file}{$string}{$lang} = $translation[0];
 				$DATA{'comment'}{$string_file}{$string}{$lang} = $translation[1] if scalar(@translation) > 1;
 				$found{$lang}++;
@@ -103,7 +101,7 @@ if ($args->{'format'} =~ /(xml|slt)/) {
 		#next if $LANG eq 'EN';
 		next if $found{$LANG} == $missing{$LANG};
 		my $template = 'strings.' . $args->{'format'} . '.tmpl';
-		my $outfile  = $dir . "/strings." . $LANG . "." . $args->{'format'};
+		my $outfile  = $dir . "/$args->{'filename'}-" . $LANG . "." . ($args->{'format'} eq 'slt' ? 'txt' : $args->{'format'});
 		print "Creating $outfile\n";
 		my $tt = Template->new({ EVAL_PERL => 1 });
 		$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
@@ -136,11 +134,12 @@ sub command_args {
 	argument to --langs is a list of languages to check for translation 
 		(defaults to @default_supported_langs)\n";
 	GetOptions(
-		'help'	=>	\$args{'help'},
-		'dirs=s'	=>	\$args{'dirstring'},
-		'langs=s'	=>	\$args{'langstring'},
-		'format=s'	=>	\$args{'format'},
-		'verbose'	=>	\$args{'verbose'},
+		'help'       => \$args{'help'},
+		'dirs=s'     => \$args{'dirstring'},
+		'langs=s'    => \$args{'langstring'},
+		'format=s'   => \$args{'format'},
+		'verbose'    => \$args{'verbose'},
+		'filename=s' => \$args{'filename'},
 	);
 	if ($args{'help'}) {
 		print $usage;
