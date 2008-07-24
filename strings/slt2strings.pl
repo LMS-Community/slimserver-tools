@@ -40,6 +40,12 @@ while (defined (my $sltFile = readdir(DIR))) {
 
 			$strings{$2}{$lang} = $3;
 			$strings{$2}{$lang} =~ s/\s+$//;
+			# Bug 8613: make sure a space is prepended on JIVE_ALLOWEDCHARS* strings
+			if ($2 && $2 =~ /^ALLOWEDCHARS/) {
+				if ($3 =~ /^\S/) {
+					$strings{$2}{$lang} = ' ' . $strings{$2}{$lang};
+				}
+			}
 		}
 	}
 	close(MYSTRINGS);
