@@ -75,33 +75,51 @@ sub generateExcludeList {
 	my @coreModules = keys %{$Module::CoreList::version{$]}};
 	my @slimModules = ();
 	my @slimDirs    = qw(Slim Plugins lib CPAN);
+	my @baseDirs    = ($baseDir); 
 
-	for my $incDir (map { catdir($baseDir, $_)} @slimDirs) {
+	# exclude some more base directories in cases where user isn't running from SVN
+	if ($^O =~/darwin/i) {
+		
+		unshift @baseDirs, $ENV{'HOME'} . "/Library/Application Support/SqueezeCenter";
+		unshift @baseDirs, "/Library/Application Support/SqueezeCenter";
+	}
+	else {
+		
+		unshift @baseDirs, '/usr/share/squeezecenter';
+		unshift @baseDirs, '/usr/share/squeezecenter/CPAN';
+	}
 
-		File::Find::find({
-			wanted => sub {
-
-				my $file = $File::Find::name;
-
-				return unless -f $file and $file =~ /\.pm/i;
-
-				my $fileBase = $incDir;
-
-				if ($incDir =~ /\bSlim$/ || $incDir =~ /\bPlugins$/) {
-
-					$fileBase = dirname($incDir);
-				}
-
-				$file =~ s/^\Q$fileBase\E(?:\\|\/)?//;
-				$file =~ s/(?:\\|\/)/::/g;
-				$file =~ s/\.[^.]+$//;
-
-				push @slimModules, $file;
-			},
-
-			no_chdir => 1,
-
-		}, $incDir);
+	for $baseDir (@baseDirs) {
+		
+		for my $incDir (map { catdir($baseDir, $_)} @slimDirs) {
+	
+			next if !-d $incDir;
+	
+			File::Find::find({
+				wanted => sub {
+	
+					my $file = $File::Find::name;
+	
+					return unless -f $file and $file =~ /\.pm/i;
+	
+					my $fileBase = $incDir;
+	
+					if ($incDir =~ /\bSlim$/ || $incDir =~ /\bPlugins$/) {
+	
+						$fileBase = dirname($incDir);
+					}
+	
+					$file =~ s/^\Q$fileBase\E(?:\\|\/)?//;
+					$file =~ s/(?:\\|\/)/::/g;
+					$file =~ s/\.[^.]+$//;
+	
+					push @slimModules, $file;
+				},
+	
+				no_chdir => 1,
+	
+			}, $incDir);
+		}
 	}
 
 	my %modules = (map { $_ => undef } @slimModules, @coreModules);
@@ -210,11 +228,11 @@ sub generateZipFile {
 	my $baseDir = shift;
 	my $plugin  = shift;
 
-	my $zipFile = join('.', $plugin->{'module'}, 'zip');
-	$zipFile =~ s/::/-/g;
-
 	my $pluginDir = $plugin->{'module'};
 	$pluginDir =~ s/(Plugins?|:)//g;
+
+	my $zipFile = join('.', $pluginDir, 'zip');
+	$zipFile = sprintf('%s-%s.zip', $pluginDir, $plugin->{'version'}) if $plugin->{version};
 
 	if (-f $zipFile) {
 
