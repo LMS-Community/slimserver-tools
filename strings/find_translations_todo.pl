@@ -119,7 +119,14 @@ sub get_strings_files {
 	my @return;
 	find sub {
 		my $file = $File::Find::name;
-		push @return, $file if $file =~ /strings\.(txt|iss)$/;
+		my $path = $File::Find::dir;
+
+		if ($path !~ /\.svn/ 
+			&& $file =~ /strings\.(txt|iss)$/
+			&& $path !~ /slimserver-strings/) {
+				
+			push @return, $file;
+		}
 	}, @$dirs;
 	return \@return;
 }

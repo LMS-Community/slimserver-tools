@@ -2,7 +2,15 @@
 [%- PERL %]
 my $file = $stash->get('file');
 $file =~ /(\w*?)\/strings.txt$/;
-$stash->set( module => $1 );
+my $id = $1;
+
+# need to treat slimservice strings differently 
+# - use same ID as previously, when it still was in SN
+if ($id eq 'slt' && $file =~ /slimservice-strings.txt$/ ) {
+	$id = 'docroot'
+} 
+
+$stash->set( module => $id );
 [%- END %]
 [%- FOR string IN data.data.$file.keys %]
 [%- IF data.data.$file.$string.$target %]
