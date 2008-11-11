@@ -30,6 +30,7 @@ my %found;
 my %missing;
 
 for my $string_file (@$strings_files) {
+	print "Reading $string_file\n";
 	open(STRINGS,"<$string_file") or die "$!";
 	my $string;
 
@@ -94,14 +95,15 @@ for my $string_file (@$strings_files) {
 
 
 if ($args->{'format'} =~ /(xml|slt)/) {
-	my $dir = "stringsFiles";
+	my $dir = $args->{product};
 	mkdir $dir unless -d $dir;
+	
 	for my $LANG (@$supported_langs) {
 		# SLT team wants EN as well
 		#next if $LANG eq 'EN';
 		next if $found{$LANG} == $missing{$LANG};
 		my $template = 'strings.' . $args->{'format'} . '.tmpl';
-		my $outfile  = $dir . "/$args->{'filename'}-" . $LANG . "." . ($args->{'format'} eq 'slt' ? 'txt' : $args->{'format'});
+		my $outfile  = $dir . "/$args->{product}-$LANG." . ($args->{'format'} eq 'slt' ? 'txt' : $args->{'format'});
 		print "Creating $outfile\n";
 		my $tt = Template->new({ EVAL_PERL => 1 });
 		$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
@@ -122,7 +124,9 @@ sub get_strings_files {
 		my $path = $File::Find::dir;
 
 		if ($path !~ /\.svn/ 
+			&& $path !~ /Plugins/
 			&& $file =~ /strings\.(txt|iss)$/
+			&& $file !~ /slimservice-strings.txt/
 			&& $path !~ /slimserver-strings/) {
 				
 			push @return, $file;
@@ -133,9 +137,10 @@ sub get_strings_files {
 
 sub command_args {
 	my %args;
-	my $usage = "usage: find_translations_todo.pl (--verbose) (--format [xml|slt|txt]) (--dirs '...') (--langs '...')
+	my $usage = "usage: find_translations_todo.pl (--verbose) (--format [xml|slt|txt]) (--dirs '...') (--langs '...') (--product '...')
 	--format defaults to txt. xml is the other option.
 	--verbose prints file information on each line
+	
 	argument to --dirs is a list of dirs to search 
 		(defaults to '.')
 	argument to --langs is a list of languages to check for translation 
@@ -146,7 +151,7 @@ sub command_args {
 		'langs=s'    => \$args{'langstring'},
 		'format=s'   => \$args{'format'},
 		'verbose'    => \$args{'verbose'},
-		'filename=s' => \$args{'filename'},
+		'product=s' => \$args{'product'},
 	);
 	if ($args{'help'}) {
 		print $usage;
@@ -166,6 +171,8 @@ sub command_args {
 		@langs = split/[^A-Z]+/, $args{'langstring'};
 	}
 	$args{'langs'} = \@langs;
+
+	$args{product} ||= 'strings';
 
 	return \%args;
 }
