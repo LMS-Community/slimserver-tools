@@ -1,7 +1,7 @@
 [%- FOR file IN data.files %]
 [%- PERL %]
 my $file = $stash->get('file');
-$file =~ /(\w*?)\/strings.txt$/;
+$file =~ /(\w*?)\/strings\.(?:txt|iss)$/;
 my $id = $1;
 
 # need to treat slimservice strings differently 
