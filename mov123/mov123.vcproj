@@ -214,6 +214,10 @@
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
 			<File
+				RelativePath="..\..\..\..\Program Files\QuickTime SDK\CIncludes\QTML.h"
+				>
+			</File>
+			<File
 				RelativePath="stdafx.h"
 				>
 			</File>
@@ -224,11 +228,7 @@
 			>
 		</Filter>
 		<File
-			RelativePath="$(QTSDK)\Libraries\QTMLClient.lib"
-			>
-		</File>
-		<File
-			RelativePath="ReadMe.txt"
+			RelativePath="..\..\..\..\Program Files\QuickTime SDK\Libraries\QTMLClient.lib"
 			>
 		</File>
 	</Files>
