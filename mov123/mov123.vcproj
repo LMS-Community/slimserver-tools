@@ -214,7 +214,7 @@
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
 			<File
-				RelativePath="..\..\..\..\Program Files\QuickTime SDK\CIncludes\QTML.h"
+				RelativePath="c:\Program Files\QuickTime SDK\CIncludes\QTML.h"
 				>
 			</File>
 			<File
@@ -228,7 +228,7 @@
 			>
 		</Filter>
 		<File
-			RelativePath="..\..\..\..\Program Files\QuickTime SDK\Libraries\QTMLClient.lib"
+			RelativePath="c:\Program Files\QuickTime SDK\Libraries\QTMLClient.lib"
 			>
 		</File>
 	</Files>
