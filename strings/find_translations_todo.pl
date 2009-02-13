@@ -14,7 +14,7 @@ use File::Find;
 use Getopt::Long;
 use Template;
 
-my @default_supported_langs = qw/ EN DA DE ES FI IT FR NL NO SV /;
+my @default_supported_langs = qw/ EN CS DA DE ES FI IT FR NL NO PL RU SV /;
 my $args            = command_args();
 my $supported_langs = $args->{'langs'};
 my $dirs            = $args->{'dirs'};
@@ -31,7 +31,7 @@ my %missing;
 
 for my $string_file (@$strings_files) {
 	print "Reading $string_file\n";
-	open(STRINGS,"<$string_file") or die "$!";
+	open(STRINGS, "<$string_file") or die "$!";
 	my $string;
 
 	if ($string_file =~ /\.txt$/i) {
