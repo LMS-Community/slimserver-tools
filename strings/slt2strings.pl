@@ -6,7 +6,7 @@ use Data::Dumper;
 use File::Find;
 use File::Spec::Functions qw/:ALL/;
 
-my @defaultLanguages = qw/ EN DA DE ES FI IT FR NL NO SV /;
+my @defaultLanguages = qw/ EN CS DA DE ES FI IT FR NL NO SV PL RU /;
 my @defaultStringfiles = qw/ strings.txt global_strings.txt /;
 my %strings;
 my $debug = 1;
