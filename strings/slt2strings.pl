@@ -24,7 +24,7 @@ $fileFilter = qr/-($fileFilter)\.txt$/i;
 while (defined (my $sltFile = readdir(DIR))) {
 
 	next unless $sltFile =~ $fileFilter;
-	my $lang = $1;
+	my $lang = uc($1);
 
 	print "Reading $sltFile...\n" if ($debug);
 
