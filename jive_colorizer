@@ -1,0 +1,65 @@
+#!/usr/bin/perl
+
+# this script takes jive console output and colorizes it according to log level
+# it has been rendered mostly obsolete now, as Richard has coded color output directly
+# into the jive console output code, but there's some code that's worth saving here.
+#
+# one alternative use for it is that saved console output could be piped through it a la
+# jive_colorizer 'cat /path/to/a/messagesFile'
+#
+# first version: bklaas 05.09
+
+use strict;
+use IO::Handle;
+use IO::Pty;
+use Term::ANSIColor;
+
+my $command = shift || die "usage: jive_colorizer path/to/jive/executable";
+
+local $Term::ANSIColor::AUTORESET = 1;
+my $colors = {
+	INFO => 'blue',
+	WARN => 'yellow',
+	ERROR => 'red',
+	DEBUG => 'green',
+};
+
+my $jive = forkptycmd($command);
+my @line;
+my $stackTraceOn = 0;
+while (<$jive>) {
+	chomp;
+	@line = split /\s+/;
+	# this is a log line with a known level
+	if ($colors->{$line[2]}) {
+		print colored( $_ . "\n", $colors->{$line[2]} );
+		$stackTraceOn = 0;
+	} elsif (/stack trace/ || $stackTraceOn) {
+		print colored( $_ . "\n", 'white on_red' );
+		$stackTraceOn = 1;
+	} else {
+		print colored( $_ . "\n", 'green' );
+		$stackTraceOn = 0;
+	}
+}
+
+sub forkptycmd($) {
+	my $cmd = shift;
+	my $pty = new IO::Pty;
+	my $pid = fork;
+	if ( !defined($pid) ) { 
+		die "error forking: $!"; 
+	}
+	if ( $pid==0 ) {
+		my $slave = $pty->slave;
+		close($pty);
+		STDOUT->fdopen($slave,'>')   || die $!;
+		STDIN->fdopen($slave,'<')    || die $!;
+		STDERR->fdopen(\*STDOUT,'>') || die $!;
+		close($slave);
+		exec($cmd);
+	}
+	$pty->close_slave();
+	return $pty;
+}
+
