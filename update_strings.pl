@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 
-# Update the strings.txt file from the SqueezeCenter project.
+# Update the strings.txt file from the Squeezebox Server project.
 #
 # Reads the strings.txt file and checks all items for the 
 # presence of an entry defined in $language.

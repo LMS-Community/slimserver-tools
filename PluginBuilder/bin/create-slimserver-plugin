@@ -70,7 +70,7 @@ sub generateExcludeList {
 	my $baseDir = shift;
 	my $outFile = shift;
 
-	print "- Generating module exclude list from the SqueezeCenter root directory\n\n";
+	print "- Generating module exclude list from the Squeezebox Server root directory\n\n";
 
 	my @coreModules = keys %{$Module::CoreList::version{$]}};
 	my @slimModules = ();

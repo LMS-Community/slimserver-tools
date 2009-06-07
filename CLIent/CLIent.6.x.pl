@@ -144,7 +144,7 @@ my $gRestoreGroupDisc;
 # Main program
 # ******************************************************************************
 
-print "\nSqueezeCenter CLI Exerciser N' Tester (CLIENT) 6.5\n\n";
+print "\nSqueezebox Server CLI Exerciser N' Tester (CLIENT) 6.5\n\n";
 			
 #testConnectDisconnect();
 #testGeneral();
@@ -1164,7 +1164,7 @@ sub __testDatabaseGenreAlbumArtist {
 					$numsearch <= keys %DB); 				
 		
 		# And found my key
-		# Don't want to re-implement here all SqueezeCenter pattern matching!
+		# Don't want to re-implement here all Squeezebox Server pattern matching!
 		my $found = 0;
 		for my $key ( keys %DBsearch ) {
 			if ($key eq $searchparam) {
@@ -1351,7 +1351,7 @@ sub testDatabasePlaylists {
 				$numsearch <= keys %DB); 				
 	
 		# And found my key
-		# Don't want to re-implement here all SqueezeCenter pattern matching!
+		# Don't want to re-implement here all Squeezebox Server pattern matching!
 		my $found = 0;
 		for my $key ( keys %DBsearch ) {
 			if ($key eq $searchparam) {
@@ -1494,7 +1494,7 @@ sub testDatabaseTitles {
 						 $num <= keys %gDBtitles); 				
 			
 			# And found my key
-			# Don't want to re-implement here all SqueezeCenter pattern matching!
+			# Don't want to re-implement here all Squeezebox Server pattern matching!
 			test_SubTest($tid, 
 						"titles SEARCH \'$searchtitle\' returns \'$searchtitle\'",
 						$match); 

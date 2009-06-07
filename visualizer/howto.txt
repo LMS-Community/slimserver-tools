@@ -8,7 +8,7 @@ allows many kinds of effects to be synchronized to the audio playback.
 			[graphic]
 
 Audio destined for the squeezebox is read in through a visualizer process
-and piped to SqueezeCenter. As the data is fed through the visualizer, it is
+and piped to Squeezebox Server. As the data is fed through the visualizer, it is
 made available to plugins which generate their effects based on either PCM
 or spectral data extracted from the stream. 
 
