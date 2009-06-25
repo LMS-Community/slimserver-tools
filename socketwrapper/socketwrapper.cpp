@@ -74,13 +74,17 @@
 // ++++++
 // Version 1.10
 // Fix thread CPU hog when input stream is closed - when EOF detected close thread. bug #5164
-
+//
+// ++++++
+// Version 1.11
+// Fix to stop socketwrapper not shutting down properly when input from stdin and output pipe is closed.
+//
 
 #include <process.h>
 #include "stdafx.h"
 #include "getopt.h"
 
-#define	 SW_ID			  "Socketwrapper 1.10\n"
+#define	 SW_ID			  "Socketwrapper 1.11beta\n"
 
 // defines & global vars for extra thread mode
 #define  MAX_STEPS        16
@@ -604,21 +608,22 @@ DWORD main(int argc, char **argv)
 
 tidy:
 	DWORD wr;
+	DWORD waittimeout = 2000; // Wait time for process / thread to pass remaining bytes in buffer.
 
 	debugMsg ( "Tidying up \n"); 
 	if (deadstep == 0) {
 		debugMsg ( " Normal source all read: Process 0 ended \n" );
 	} else {
 		if (deadstep != -1) debugMsg ( " Process/thread %d stopped\n", deadstep );
+		if ((deadstep +1) == numSteps) {
+				debugMsg ( " Output Process/thread %d stopped\n", deadstep );
+				waittimeout = 50 ; // Make shutdown faster if last process has stopped since no more bytes can be sent to output
+		}
 		if (fDie) debugMsg ( "Watchdog expired \n"); 
 	}
 	for( int i = 0; i < numSteps; ++i ){
 		if( info[i].fIsWorkerThread ){
-				if (bWatchdogEnabled)
-					wr = WaitForSingleObject( hChild[i],2000 );
-				else 
-					wr = WaitForSingleObject( hChild[i],INFINITE );
-
+				wr = WaitForSingleObject( hChild[i],waittimeout );
 				if( wr==WAIT_TIMEOUT ) {
 					stderrMsg( "Tidying up - Thread for step %d hasn't died.\n", i );
 				} else if( wr==WAIT_FAILED ) {
