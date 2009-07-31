@@ -15,6 +15,7 @@ use File::Copy;
 
 my $pluginIconMap = {
 	Amazon	=>	'icon_amazon_store.png',
+	AppGallery =>   'icon_app_gallery.png',
 	Classical =>	'icon_classicaldotcom_C.png',
 	Deezer =>	'icon_deezer.png',
 	DigitalInput =>	'icon_digital_inputs.png',
@@ -28,6 +29,7 @@ my $pluginIconMap = {
 	Mediafly =>	'icon_Mediafly.png',
 	MP3tunes =>	'icon_MP3tunes.png',
 	MusicMagic =>	'icon_music_ip.png',
+	MyApps =>       'icon_my_apps.png',
 	Napster =>	'icon_napster.png',
 	Pandora =>	'icon_pandora_P.png',
 	# note: the filename typo below is in svn, it's not a typo here
