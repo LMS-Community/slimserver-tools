@@ -35,17 +35,22 @@ while (defined (my $sltFile = readdir(DIR))) {
 		chomp;
 
 		if (/^(.*)__(.*?)\t(.*)$/) {
+			
+			my ($token, $string) = ($2, $3);
 
-			print "Duplicate value? $1, $2, $lang\n" if ($strings{$2}{$lang});
+			print "Duplicate value? $1, $token, $lang\n" if ($strings{$token}{$lang});
 
-			$strings{$2}{$lang} = $3;
-			$strings{$2}{$lang} =~ s/\s+$//;
+			($string) = split /\t/, $string;
+			$string =~ s/\s+$//;
+
 			# Bug 8613: make sure a space is prepended on JIVE_ALLOWEDCHARS* strings
-			if ($2 && $2 =~ /^ALLOWEDCHARS/) {
-				if ($3 =~ /^\S/) {
-					$strings{$2}{$lang} = ' ' . $strings{$2}{$lang};
+			if ($token && $token =~ /^ALLOWEDCHARS/) {
+				if ($string =~ /^\S/) {
+					$string = ' ' . $string;
 				}
 			}
+
+			$strings{$token}{$lang} = $string;
 		}
 	}
 	close(MYSTRINGS);
@@ -182,14 +187,16 @@ sub mergeCustomStrings {
 
 # sorts the different translations for a string according to their language code
 sub sortStrings {
-	my $stringsToSort = shift;
+	my @translatedStrings = grep /\w/, split(/\n/, shift);
 
-	$stringsToSort =~ /^([\w\-]+)(.*)/smi;
-	my $stringName = $1;
-	my @translatedStrings = split(/\n/, $2);
-
-	@translatedStrings = sort(@translatedStrings);
-	return $stringName . join("\n", @translatedStrings) . "\n";
+	@translatedStrings = sort {
+		return -1 if $a =~ /^\w/;
+		return -1 if ($a =~ /^#/ && $b !~ /^#/);
+		return 1 if ($b =~ /^#/ && $a !~ /^#/);
+		
+		$a cmp $b;
+	} @translatedStrings;
+	return join("\n", @translatedStrings) . "\n";
 }
 
 sub getArgs {

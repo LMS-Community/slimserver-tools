@@ -40,16 +40,13 @@ for my $string_file (@$strings_files) {
 			# remove newline chars and trailing tabs/spaces
 			chomp; s/[\t\s]+$//; 
 	
-			# skip all lines that don't start with a number/capital letter 
-			# or zero or more tabs/spaces, followed by a number/capital letter
-			next unless /^[\t\s]*[A-Z0-9]/; 
-	
 			# this is a STRING ID
 			if (/^[A-Z0-9]/) {
 				$string = $_;
 				# add {FILE}{STRING} to %DATA, with blanks for all supported langs
 				for my $lang (@$supported_langs) {
 					$DATA{'data'}{$string_file}{$string}{$lang} = "";
+					delete $DATA{'data'}{$string_file}{$string}{SLT};
 					map { $missing{$_}++ } @$supported_langs;
 				}
 			}
@@ -62,6 +59,13 @@ for my $string_file (@$strings_files) {
 				$DATA{'comment'}{$string_file}{$string}{$lang} = $translation[1] if scalar(@translation) > 1;
 				$found{$lang}++;
 			}
+			
+			# this is a comment for the translators
+			elsif ($string ne "" && /^#\s*SLT[\s:]+(.*)/si) {
+				$DATA{'data'}{$string_file}{$string}{SLT} ||= '';
+				$DATA{'data'}{$string_file}{$string}{SLT} .= $1;
+			}
+			
 		}
 	}
 	elsif ($string_file =~ /\.iss/i) {
