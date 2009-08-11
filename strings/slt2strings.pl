@@ -157,7 +157,7 @@ sub mergeCustomStrings {
 	my $stringCopy = $$originalStrings;
 
 	# get strings one after another in a block of string token and translations
-	while ($stringCopy =~ /(^\S+.*?)(^\s*\n|\z)/gsmi) {
+	while ($stringCopy =~ /(^\w+.*?)(^\s*\n|\z)/gsmi) {
 
 		my $stringsToTranslate = $1;
 
@@ -191,6 +191,7 @@ sub sortStrings {
 
 	@translatedStrings = sort {
 		return -1 if $a =~ /^\w/;
+		return 1 if $b =~ /^\w/;
 		return -1 if ($a =~ /^#/ && $b !~ /^#/);
 		return 1 if ($b =~ /^#/ && $a !~ /^#/);
 		
