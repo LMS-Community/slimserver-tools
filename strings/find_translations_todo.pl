@@ -76,6 +76,7 @@ for my $string_file (@$strings_files) {
 
 			next unless /([a-z]{2})\.(\w+?)=(.*)/i;
 			(my $lang, my $string, my $translation) = (uc($1), $2, $3);
+			$lang =~ s/CZ/CS/i;
 
 			if (!$DATA{'data'}{$string_file}{$string}) {
 				# add {FILE}{STRING} to %DATA, with blanks for all supported langs
