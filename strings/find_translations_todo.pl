@@ -128,6 +128,7 @@ sub get_strings_files {
 		my $path = $File::Find::dir;
 
 		if ($path !~ /\.svn/ 
+			&& $path !~ /SqueezePlay\.app/
 			&& $path !~ /Plugins/
 			&& $file =~ /strings\.(txt|iss)$/
 			&& $file !~ /slimservice-strings.txt/
