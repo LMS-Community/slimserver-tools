@@ -14,7 +14,7 @@ $stash->set( module => $id );
 [%- END %]
 [%- FOR string IN data.data.$file.keys %]
 [%- IF data.data.$file.$string.$target %]
-[%- module _ '__' _ string %]	[% data.data.$file.$string.$target %]	[% data.data.$file.$string.SLT %]
+[%- module _ '__' _ string %]	[% data.data.$file.$string.$target %]	[% data.data.$file.$string.SLT ? 'Dev: ' _ data.data.$file.$string.SLT : ''  %]
 [% END %]
 [%- END %]
 [%- END %]
