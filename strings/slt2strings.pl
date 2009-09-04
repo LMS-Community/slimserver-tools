@@ -212,8 +212,10 @@ sub mergeCustomIssStrings {
 
 	foreach my $key (sort keys %strings) {
 		foreach my $lang (sort keys %{$strings{$key}}) {
-			
+
 			my $id  = lc($lang) . '.' . $key;
+			   $id  =~ s/^cs/cz/;
+			   
 			my $val = $strings{$key}->{$lang};
 			
 			next unless $id && $val;
