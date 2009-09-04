@@ -262,13 +262,16 @@ sub mergeCustomIssStrings {
 
 sub getArgs {
 	my %args;
-	my $usage = "usage: slt2strings.pl (--langs '...') (--iss) (--quiet) --dir '...'
+	my $usage = "
+usage: slt2strings.pl (--langs '...') (--iss) (--quiet) --dir '...'
 	argument to --dir is the root folder of the directory tree we want to search for strings.txt files
 
 	argument to --langs is a list of languages to check for translation 
 		(defaults to @defaultLanguages)\n
 		
-	--iss will merge the files in the InnoSetup Strings file format";
+	--iss will merge the files in the InnoSetup Strings file format
+
+";
 
 	my $quiet;
 
