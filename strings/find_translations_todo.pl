@@ -113,11 +113,49 @@ if ($args->{'format'} =~ /(xml|slt)/) {
 		my $tt = Template->new({ EVAL_PERL => 1 });
 		$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
 	}
-} else {
+}
+
+elsif ($args->{'format'} eq 'txt') {
 	my $template = 'strings.' . $args->{'format'} . '.tmpl';
 	my $outfile  = "strings." . $args->{'format'};
 	my $tt = Template->new;
 	$tt->process($template, { data => \%DATA }, $outfile) || die $tt->error;
+}
+
+# print a list of missing translations
+else {
+	foreach my $file (@{$DATA{files}}) {
+		
+		foreach my $token (keys %{ $DATA{data}->{$file} }) {
+			
+			# we're not interested in _DBL tokens
+			next if $token =~ /_DBL$/;
+
+			my @missing_languages;
+
+			foreach my $lang (@{$DATA{langs}}) {
+				if (! $DATA{data}->{$file}->{$token}->{$lang}) {
+					push @missing_languages, $lang;
+					delete $DATA{data}->{$file}->{$token}->{$lang};
+				}
+			}
+
+			if (scalar @missing_languages) {
+				my $original = $DATA{data}->{$file}->{$token}->{EN};
+				my $original_language = 'EN';
+				
+				if (!$original) {
+					my @existing = keys %{ $DATA{data}->{$file}->{$token} };
+					$original_language = $existing[0];
+					$original = $DATA{data}->{$file}->{$token}->{ $existing[0] };
+				}
+
+				if ($original) {
+					print "$file: $token\n$original_language: $original\nmissing: " . join(', ', @missing_languages) . "\n\n";
+				}
+			}
+		}
+	}
 }
 
 exit 1;
@@ -144,25 +182,31 @@ sub get_strings_files {
 sub command_args {
 	my %args;
 	my $usage = "usage: find_translations_todo.pl (--verbose) (--format [xml|slt|txt]) (--dirs '...') (--langs '...') (--product '...')
-	--format defaults to txt. xml is the other option.
+	--format which output format you want
 	--verbose prints file information on each line
 	
 	argument to --dirs is a list of dirs to search 
 		(defaults to '.')
 	argument to --langs is a list of languages to check for translation 
-		(defaults to @default_supported_langs)\n";
+		(defaults to @default_supported_langs)
+
+	If no --format is defined, the script will print a list of strings
+	for which one or more translations are missing\n";
+		
 	GetOptions(
 		'help'       => \$args{'help'},
 		'dirs=s'     => \$args{'dirstring'},
 		'langs=s'    => \$args{'langstring'},
 		'format=s'   => \$args{'format'},
 		'verbose'    => \$args{'verbose'},
-		'product=s' => \$args{'product'},
+		'product=s'  => \$args{'product'},
 	);
+	
 	if ($args{'help'}) {
 		print $usage;
 		exit;
 	}
+	
 	# parse dirs by spaces 
 	my @dirs = ( '.' );
 	if ($args{'dirstring'}) {
