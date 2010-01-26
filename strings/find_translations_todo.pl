@@ -110,7 +110,7 @@ if ($args->{'format'} =~ /(xml|slt)/) {
 		my $template = 'strings.' . $args->{'format'} . '.tmpl';
 		my $outfile  = $dir . "/$args->{product}-$LANG." . ($args->{'format'} eq 'slt' ? 'txt' : $args->{'format'});
 		print "Creating $outfile\n";
-		my $tt = Template->new({ EVAL_PERL => 1 });
+		my $tt = Template->new({ EVAL_PERL => 1, ENCODING => 'utf8' });
 		$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
 	}
 }
