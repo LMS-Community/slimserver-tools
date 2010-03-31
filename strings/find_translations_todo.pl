@@ -110,8 +110,16 @@ if ($args->{'format'} =~ /(xml|slt)/) {
 		my $template = 'strings.' . $args->{'format'} . '.tmpl';
 		my $outfile  = $dir . "/$args->{product}-$LANG." . ($args->{'format'} eq 'slt' ? 'txt' : $args->{'format'});
 		print "Creating $outfile\n";
+		
+		my $content = "";
 		my $tt = Template->new({ EVAL_PERL => 1, ENCODING => 'utf8' });
-		$tt->process($template, { data => \%DATA , target => $LANG }, $outfile) || die $tt->error;
+		$tt->process($template, { data => \%DATA , target => $LANG }, \$content) || die $tt->error;
+		
+		open(STRINGS, ">:raw", $outfile) or die "Couldn't open $outfile for writing: $!\n";
+		print STRINGS "\x{FEFF}";		# insert BOM
+		binmode STRINGS;
+		print STRINGS $content;
+		close(STRINGS);
 	}
 }
 
