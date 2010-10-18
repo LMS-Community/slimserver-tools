@@ -53,6 +53,7 @@ for my $string_file (@$strings_files) {
 	
 			# this is a TRANSLATION
 			elsif ($string ne "" && /^[\t\s]+[A-Z][A-Z]/) {
+				next if $string !~ /$args->{filter}/i;
 				s/^[\t|\s]+//;
 				my ($lang, @translation) = split /[\t]+/;
 				$DATA{'data'}{$string_file}{$string}{$lang} = $translation[0];
@@ -189,9 +190,10 @@ sub get_strings_files {
 
 sub command_args {
 	my %args;
-	my $usage = "usage: find_translations_todo.pl (--verbose) (--format [xml|slt|txt]) (--dirs '...') (--langs '...') (--product '...')
+	my $usage = "usage: find_translations_todo.pl (--verbose) (--format [xml|slt|txt]) (--dirs '...') (--langs '...') (--product '...') (--filter '...')
 	--format which output format you want
 	--verbose prints file information on each line
+	--filter if you only want strings with a matching ID (regex)
 	
 	argument to --dirs is a list of dirs to search 
 		(defaults to '.')
@@ -208,6 +210,7 @@ sub command_args {
 		'format=s'   => \$args{'format'},
 		'verbose'    => \$args{'verbose'},
 		'product=s'  => \$args{'product'},
+		'filter=s'   => \$args{'filter'},
 	);
 	
 	if ($args{'help'}) {
