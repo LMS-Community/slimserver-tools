@@ -11,6 +11,8 @@
 
 use strict;
 use File::Find;
+use Data::Dump qw(dump);
+use utf8;
 use Getopt::Long;
 use Template;
 
@@ -53,7 +55,7 @@ for my $string_file (@$strings_files) {
 	
 			# this is a TRANSLATION
 			elsif ($string ne "" && /^[\t\s]+[A-Z][A-Z]/) {
-				next if $string !~ /$args->{filter}/i;
+				next if $args->{filter} && $string !~ /$args->{filter}/i;
 				s/^[\t|\s]+//;
 				my ($lang, @translation) = split /[\t]+/;
 				$DATA{'data'}{$string_file}{$string}{$lang} = $translation[0];
@@ -91,6 +93,19 @@ for my $string_file (@$strings_files) {
 
 			$found{$lang}++;
 		}		
+	}
+	elsif ($string_file =~ /\.json/i) {
+		require File::Slurp;
+		require JSON::XS;
+
+		my $strings = File::Slurp::read_file($string_file);
+		utf8::encode($strings);
+		
+		$DATA{'data'}{$string_file} = eval {
+			JSON::XS::decode_json( $strings )
+		} || die $@;
+		
+		map { $found{$_} = 1 } @{ $DATA{langs} };
 	}
 
 	close(STRINGS);
@@ -175,10 +190,10 @@ sub get_strings_files {
 		my $file = $File::Find::name;
 		my $path = $File::Find::dir;
 
-		if ($path !~ /\.svn/ 
+		if ($file =~ /strings\.(txt|iss|json)$/ 
+			&& $path !~ /\.svn/
 			&& $path !~ /SqueezePlay\.app/
 			&& $path !~ /Plugins/
-			&& $file =~ /strings\.(txt|iss)$/
 			&& $file !~ /slimservice-strings.txt/
 			&& $path !~ /slimserver-strings/) {
 				
