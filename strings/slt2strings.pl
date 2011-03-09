@@ -2,14 +2,20 @@
 
 use strict;
 use Getopt::Long;
-use Data::Dumper;
+use Data::Dump;
 use File::Find;
 use File::Spec::Functions qw/:ALL/;
 
 my @defaultLanguages = qw/ EN CS DA DE ES FI IT FR NL NO SV PL RU /;
 my $args = getArgs();
 
-my @defaultStringfiles = $args->{iss} ? qw/ strings.iss / : qw/ strings.txt global_strings.txt /;
+my @defaultStringfiles = $args->{format} eq 'iss' ? qw/ strings.iss / : qw/ strings.txt global_strings.txt /;
+
+if ($args->{format} eq 'json') {
+	require File::Slurp;
+	require JSON::XS;
+}
+
 my %strings;
 my $debug = 1;
 
@@ -58,71 +64,99 @@ while (defined (my $sltFile = readdir(DIR))) {
 }
 closedir(DIR);
 
-my $tmpFolder = catdir($dirname, 'tmp');
-unless (-d $tmpFolder) {
-	mkdir $tmpFolder or die "Couldn't create $tmpFolder: $!\n";
-}
-
 # search target folder for strings files
-find sub {
-	my $stringsFile = $File::Find::name;
-	my $shortName = $_;
+if ($args->{format} eq 'json') {
+	my $stringsFile = catdir($args->{dir}, 'strings.json');
+	
+	# read original file if available, make sure the new translations don't miss a string
+	my $oldStrings = eval {
+		my $s = File::Slurp::read_file($stringsFile);
+		utf8::encode($s);
+		JSON::XS::decode_json($s);
+	} || {};
+	
+	if ($@) {
+		warn "Problem reading original file? $@\n";
+	}
 
-	if (grep { $stringsFile =~ /$_$/ } @defaultStringfiles) {
+	foreach my $key (keys %$oldStrings) {
+		unless (defined $strings{$key}) {
+			print "Translation missing for string $key\n";
+			$strings{$key} = $oldStrings->{$key};
+		}
+	}	
 
-		print "Processing $stringsFile\n" if ($debug);
-
-		if (-w $stringsFile) {
-
-			my ($tmpFile, $tmpFolder) = getTmpFile($shortName, $File::Find::dir);
-
-			my $originalStrings = getStringsFile($stringsFile);
-			
-			if ($args->{iss}) {
-				mergeCustomIssStrings(\$originalStrings);
+	File::Slurp::write_file(
+		catdir($args->{dir}, 'strings.json'),
+		JSON::XS->new->pretty->encode(\%strings)
+	);
+}
+else {
+	my $tmpFolder = catdir($dirname, 'tmp');
+	unless (-d $tmpFolder) {
+		mkdir $tmpFolder or die "Couldn't create $tmpFolder: $!\n";
+	}
+	
+	find sub {
+		my $stringsFile = $File::Find::name;
+		my $shortName = $_;
+	
+		if (grep { $stringsFile =~ /$_$/ } @defaultStringfiles) {
+	
+			print "Processing $stringsFile\n" if ($debug);
+	
+			if (-w $stringsFile) {
+	
+				my ($tmpFile, $tmpFolder) = getTmpFile($shortName, $File::Find::dir);
+	
+				my $originalStrings = getStringsFile($stringsFile);
+				
+				if ($args->{iss}) {
+					mergeCustomIssStrings(\$originalStrings);
+				}
+				else {
+					mergeCustomStrings(\$originalStrings);
+				}
+	
+				open(STRINGS, ">:utf8", $tmpFile) or die "Couldn't open $tmpFile for writing: $!\n";
+				binmode STRINGS;
+				print STRINGS $originalStrings;
+				close(STRINGS);
+	
+				rename $tmpFile, $stringsFile;
+	
+				rmdir $tmpFolder;
 			}
+		
 			else {
-				mergeCustomStrings(\$originalStrings);
+				print "$stringsFile is not writable\n";
 			}
-
-			open(STRINGS, ">:utf8", $tmpFile) or die "Couldn't open $tmpFile for writing: $!\n";
-			binmode STRINGS;
-			print STRINGS $originalStrings;
-			close(STRINGS);
-
-			rename $tmpFile, $stringsFile;
-
-			rmdir $tmpFolder;
 		}
 	
-		else {
-			print "$stringsFile is not writable\n";
-		}
-	}
+	}, ($args->{'dir'});
 
-}, ($args->{'dir'});
-
-# write file with unknown translations
-if (keys %strings) {
+	# write file with unknown translations
+	if (keys %strings) {
+		
+		my $stringsFile = catdir($tmpFolder, 'unknown-strings.txt');
 	
-	my $stringsFile = catdir($tmpFolder, 'unknown-strings.txt');
-
-	print "Writing out unknown strings to $stringsFile\n" if ($debug);
-
-	open(STRINGS, ">:utf8", $stringsFile) or die "Couldn't open $stringsFile for writing: $!\n";
-	binmode STRINGS;
-
-	foreach my $stringName (sort keys %strings) {
-		print STRINGS "$stringName\n";
-
-		foreach my $language (keys %{$strings{$stringName}}) {
-			print STRINGS "\t$language\t$strings{$stringName}->{$language}\n";
+		print "Writing out unknown strings to $stringsFile\n" if ($debug);
+	
+		open(STRINGS, ">:utf8", $stringsFile) or die "Couldn't open $stringsFile for writing: $!\n";
+		binmode STRINGS;
+	
+		foreach my $stringName (sort keys %strings) {
+			print STRINGS "$stringName\n";
+	
+			foreach my $language (keys %{$strings{$stringName}}) {
+				print STRINGS "\t$language\t$strings{$stringName}->{$language}\n";
+			}
+	
+			print STRINGS "\n";
 		}
-
-		print STRINGS "\n";
+	
+		close(STRINGS);
 	}
-
-	close(STRINGS);
 }
 
 
@@ -265,13 +299,14 @@ sub mergeCustomIssStrings {
 sub getArgs {
 	my %args;
 	my $usage = "
-usage: slt2strings.pl (--langs '...') (--iss) (--quiet) --dir '...'
+usage: slt2strings.pl (--langs '...') (--format=[iss|json|txt]) (--quiet) --dir '...'
 	argument to --dir is the root folder of the directory tree we want to search for strings.txt files
 
 	argument to --langs is a list of languages to check for translation 
 		(defaults to @defaultLanguages)\n
 		
-	--iss will merge the files in the InnoSetup Strings file format
+	--format=iss will merge the files in the InnoSetup Strings file format
+	--format=json will dump a json file of the language hash
 
 ";
 
@@ -282,7 +317,7 @@ usage: slt2strings.pl (--langs '...') (--iss) (--quiet) --dir '...'
 		'langs=s' => \$args{'langstring'},
 		'quiet'   => \$quiet,
 		'dir=s'   => \$args{'dir'},
-		'iss'     => \$args{'iss'},
+		'format=s'=> \$args{'format'},
 	);
 
 	if ($args{'help'} || !$args{'dir'}) {
@@ -296,7 +331,8 @@ usage: slt2strings.pl (--langs '...') (--iss) (--quiet) --dir '...'
 	}
 
 	$debug = !$quiet;
-	$args{'langs'} = \@langs;
+	$args{langs}  = \@langs;
+	$args{format} = lc($args{format});
 
 	return \%args;
 }
