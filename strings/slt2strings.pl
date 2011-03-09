@@ -80,9 +80,16 @@ if ($args->{format} eq 'json') {
 	}
 
 	foreach my $key (keys %$oldStrings) {
-		unless (defined $strings{$key}) {
+		if (!defined $strings{$key}) {
 			print "Translation missing for string $key\n";
 			$strings{$key} = $oldStrings->{$key};
+		}
+		else {
+			foreach my $lang (keys %{$oldStrings->{$key}}) {
+				if (!$strings{$key}{$lang}) {
+					$strings{$key}{$lang} = $oldStrings->{$key}->{$lang};
+				}
+			}
 		}
 	}	
 
