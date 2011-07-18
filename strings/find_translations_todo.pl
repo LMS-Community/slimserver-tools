@@ -240,7 +240,7 @@ sub command_args {
 	}
 	$args{'dirs'} = \@dirs;
 
-	$args{'format'} eq 'txt' unless $args{'format'};
+	$args{'format'} = 'slt' unless $args{'format'};
 
 	my @langs = @default_supported_langs;
 	if ($args{'langstring'}) {
