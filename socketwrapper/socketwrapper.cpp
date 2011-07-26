@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: 4; c-basic-offset: 4 -*- */
 //
-// Squeezebox Server Copyright (C) 2003-2004 Vidur Apparao, Slim Devices Inc.
+// Logitech Media Server Copyright (C) 2003-2011 Vidur Apparao, Logitech Inc.
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License,
 // version 2.

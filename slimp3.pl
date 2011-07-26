@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
-# Squeezebox Server Copyright 2003-2007 Logitech.
+# Logitech Media Server Copyright 2003-2011 Logitech.
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License,
 # version 2.
 
 #
-# Command line interface for the controlling the Squeezebox Server
+# Command line interface for the controlling the Logitech Media Server
 #
 
 use strict;
