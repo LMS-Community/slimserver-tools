@@ -1,0 +1,126 @@
+../../platforms/osx/Preference Pane/Launcher.plist
+../../platforms/osx/Preference Pane/Pref_Tester.plist
+../../platforms/osx/Preference Pane/Czech.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Danish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Dutch.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/English.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Finnish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/French.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/German.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Italian.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Norwegian.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Polish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Russian.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Spanish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Swedish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Czech.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Danish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Dutch.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/English.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Finnish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/French.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/German.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Italian.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Norwegian.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Polish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Russian.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Spanish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Swedish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Czech.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Danish.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Dutch.lproj/Pref.strings
+../../platforms/osx/Preference Pane/English.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Finnish.lproj/Pref.strings
+../../platforms/osx/Preference Pane/French.lproj/Pref.strings
+../../platforms/osx/Preference Pane/German.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Italian.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Norwegian.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Polish.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Russian.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Spanish.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Swedish.lproj/Pref.strings
+../../platforms/osx/Preference Pane/Czech.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Danish.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Dutch.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/English.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Finnish.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/French.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/German.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Italian.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Norwegian.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Polish.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Russian.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Spanish.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Swedish.lproj/Pref.nib/keyedobjects.nib
+../../platforms/osx/Preference Pane/Czech.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Danish.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Dutch.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/English.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Finnish.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/French.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/German.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Italian.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Norwegian.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Polish.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Russian.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Spanish.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Swedish.lproj/Pref.nib/designable.nib
+../../platforms/osx/Preference Pane/Installer/Czech.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Danish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Dutch.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/English.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Finnish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/French.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/German.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Italian.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Norwegian.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Polish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Russian.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Spanish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Swedish.lproj/InfoPlist.strings
+../../platforms/osx/Preference Pane/Installer/Czech.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Danish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Dutch.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/English.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Finnish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/French.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/German.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Italian.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Norwegian.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Polish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Russian.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Spanish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Swedish.lproj/Localizable.strings
+../../platforms/osx/Preference Pane/Installer/Czech.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/Danish.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/Dutch.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/English.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/Finnish.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/French.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/German.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/Italian.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/Norwegian.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/Polish.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/Russian.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/Spanish.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/Installer/Swedish.lproj/MainMenu.strings
+../../platforms/osx/Preference Pane/SqueezeCenter.xcodeproj/project.pbxproj
+../../platforms/osx/Preference Pane/Info.plist
+../../platforms/osx/Preference Pane/Launcher.plist
+../../platforms/osx/Preference Pane/Installer.plist
+../../platforms/osx/Preference Pane/Pref_Tester.plist
+../../platforms/solaris/makeit.sh
+../../platforms/readynas/addon_template/addons.conf
+../../platforms/readynas/addon_template/SQUEEZEBOX_AVAILABLE.xml
+../../platforms/readynas/addon_template/SQUEEZEBOX_CURRENT.xml
+../../platforms/readynas/addon_template/SQUEEZEBOX.xml
+../../platforms/redhat/squeezeboxserver.spec
+../../platforms/win32/installer/SqueezeCenter.iss
+../../platforms/win32/installer/SqueezeCenter.wxs
+../../server/HTML/EN/html/softsqueeze/index.html
+../../server/strings.txt
+../../server/cleanup.pl
+../../server/scanner.pl
+../../server/slimserver.pl
+../../server/slimservice.pl
+../../server/Slim/bootstrap.pm
