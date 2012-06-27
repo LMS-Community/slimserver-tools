@@ -73,7 +73,7 @@ if ($doDaDupes) {
 print "\nCreating dictionary of potential source code matches...\n";
 my %sourceLines;
 
-open SC, "ack --perl --html --lua --nosmart-case -oh \"\\b[A-Z][A-Z_\\d]{2,}\\b\" $sourceDirs |";
+open SC, "ack --perl --html --lua --tt --nosmart-case -oh \"\\b[A-Z][A-Z_\\d]{2,}\\b\" $sourceDirs |";
 while (<SC>) {
 	# remove newline chars and trailing tabs/spaces
 	chomp; s/[\t\s]+$//; 
@@ -81,6 +81,11 @@ while (<SC>) {
 	$sourceLines{$_}++;
 }
 print "Found " . scalar(keys %sourceLines) . " candidates\n";
+
+if (!keys %sourceLines) {
+	print "\nDidn't find any candidates in source code files - aborting.\n";
+	exit;
+}
 
 print "\nFinding potentially unused string tokens...\n";
 my $ignoreRegex = join('|', CONCATENATED_TOKENS);
