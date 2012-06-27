@@ -1,0 +1,53 @@
+#!/usr/bin/perl -w
+
+# $Id$
+#
+# Quick hack at updating the version number automatically.
+#
+# Always verify before checking in - especially the .nib files.
+
+use strict;
+use File::Copy;
+
+sub main {
+	my $oldVersion = $ARGV[0] || die "Usage: $0 oldVersion newVersion\n";
+	my $newVersion = $ARGV[1] || die "Usage: $0 oldVersion newVersion\n";
+
+	# Fix up dots to be escaped
+	$oldVersion =~ s/\./\\\./g;
+
+	open LIST, 'version-files' or die "Cannot open version-files: $!";
+
+	while (my $file = <LIST>) {
+		chomp $file;
+
+		if ( !-e $file ) {
+			print "Missing: $file\n";
+			next;
+		}
+		else {
+			print "$file\n";
+		}
+
+		# Uncomment if the version number is changing from 5 bytes to
+		# something else, and manually update the nib files.
+		# next if $file =~ /\.nib/;
+
+		open OLDFILE, $file or die "Cannot open $file: $!";
+		open NEWFILE, ">$file.new" or die "Cannot open temp file $file.new: $!";
+
+		while (<OLDFILE>) {
+			s/$oldVersion/$newVersion/g;
+			print NEWFILE $_;
+		}
+
+		close OLDFILE;
+		close NEWFILE;
+
+		move("$file.new", $file) or die $!;
+	}
+
+	close LIST;
+}
+
+main();
