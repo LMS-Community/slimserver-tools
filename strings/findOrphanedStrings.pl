@@ -144,6 +144,13 @@ my %sourceLines;
 if ($cacheSourceData) {
 	eval {
 		%sourceLines = %{ Storable::retrieve(SOURCE_CACHE) };
+
+		if ($sourceLines{_cache_key} && $sourceLines{_cache_key} ne $sourceDirs) {
+			%sourceLines = ();
+		}
+		else {
+			print "Using cached dictionary.\n";
+		}
 	};
 }
 else {
@@ -161,6 +168,7 @@ if (!keys %sourceLines) {
 }
 
 if ($cacheSourceData && keys %sourceLines) {
+	$sourceLines{_cache_key} = $sourceDirs;
 	Storable::store(\%sourceLines, SOURCE_CACHE);
 }
 
