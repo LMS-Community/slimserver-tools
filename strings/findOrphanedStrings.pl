@@ -216,14 +216,35 @@ sub getStringsFiles {
 
 sub getArgs {
 	my $dirstring;
+	my $help;
 
 	GetOptions(
+		'help'         => \$help,
 		'stringDirs=s' => \$dirstring,
 		'sourceDirs=s' => \$sourceDirs,
 		'dupes'        => \$doDaDupes,
 		'filter=s'     => \$tokenFilter,
 		'cache'        => \$cacheSourceData,
 	);
+
+	if ($help || !$dirstring || !$sourceDirs) {
+		print "
+usage: $0 --stringDirs '...' --sourceDirs '...' (--dupes) (--cache) (--filter '...')
+   stringDirs - a space separated list of folders which will be recursively searched for strings files
+   sourceDirs - a space separated list of folders with our source files
+   dupes      - print a list of duplicate string definitions
+   filter     - a regex to be used to filter the resulting token list
+   cache      - cache dictionary of potential string tokens found in the source code
+
+PLEASE NOTE: do NOT blindly trust the resulting list. As sometimes string tokens are concatenated
+             and processed in other ways, the static search is likely to fail in many ways.
+
+This scripts uses ack (http://betterthangrep.com/) to do the heavy lifting. Make sure it's installed
+on your system and can be found in the default paths.
+
+";
+		exit;
+	}
 	
 	# parse dirs by spaces 
 	my @dirs = ( '.' );
