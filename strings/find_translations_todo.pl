@@ -228,7 +228,7 @@ sub command_args {
 		'filter=s'   => \$args{'filter'},
 	);
 	
-	if ($args{'help'}) {
+	if ($args{'help'} || !$args{dirstring}) {
 		print $usage;
 		exit;
 	}
