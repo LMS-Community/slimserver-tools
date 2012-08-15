@@ -118,7 +118,7 @@ else {
 	
 				my $originalStrings = getStringsFile($stringsFile);
 				
-				if ($args->{iss}) {
+				if ($args->{format} eq 'iss') {
 					mergeCustomIssStrings(\$originalStrings);
 				}
 				else {
@@ -252,6 +252,9 @@ sub mergeCustomIssStrings {
 	my ($originalStrings) = @_;
 
 	foreach my $key (sort keys %strings) {
+		# skip all uppercase IDs - we don't use them in .iss files
+		next if length($key) > 3 && $key !~ /[a-z]/;
+
 		foreach my $lang (sort keys %{$strings{$key}}) {
 
 			my $id  = lc($lang) . '.' . $key;
