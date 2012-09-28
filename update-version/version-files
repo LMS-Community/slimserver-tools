@@ -114,6 +114,9 @@
 ../../platforms/readynas/addon_template/SQUEEZEBOX_AVAILABLE.xml
 ../../platforms/readynas/addon_template/SQUEEZEBOX_CURRENT.xml
 ../../platforms/readynas/addon_template/SQUEEZEBOX.xml
+../../platforms/readynas/addon_template/UEML.xml
+../../platforms/readynas/addon_template/UEML_AVAILABLE.xml
+../../platforms/readynas/addon_template/UEML_CURRENT.xml
 ../../platforms/redhat/squeezeboxserver.spec
 ../../platforms/win32/installer/SqueezeCenter.iss
 ../../platforms/win32/installer/SqueezeCenter.wxs
@@ -123,4 +126,5 @@
 ../../server/scanner.pl
 ../../server/slimserver.pl
 ../../server/slimservice.pl
+../../server/ueml.pl
 ../../server/Slim/bootstrap.pm
