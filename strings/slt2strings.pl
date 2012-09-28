@@ -214,6 +214,9 @@ sub mergeCustomStrings {
 		# no white space allowed in token
 		if (($stringName !~ /(?:#|\s)/) && defined $strings{$stringName}) {
 			foreach my $language (keys %{$strings{$stringName}}) {
+				
+				next if $language ne 'EN' && $strings{$stringName}->{$language} eq $strings{$stringName}->{EN};
+				
 				# try to replace the translation...
 				if ($stringsToTranslate !~ s/^(\t$language\t).+?$/$1$strings{$stringName}->{$language}/ism) {
 					# ... or simply add it
