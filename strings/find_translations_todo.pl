@@ -119,7 +119,7 @@ if ($args->{'format'} =~ /(xml|slt)/) {
 	my $dir = $args->{product};
 	mkdir $dir unless -d $dir;
 	
-	for my $LANG (@$supported_langs) {
+	for my $LANG (sort @$supported_langs) {
 		# SLT team wants EN as well
 		#next if $LANG eq 'EN';
 		next if $found{$LANG} == $missing{$LANG};
