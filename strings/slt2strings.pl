@@ -215,7 +215,7 @@ sub mergeCustomStrings {
 		if (($stringName !~ /(?:#|\s)/) && defined $strings{$stringName}) {
 			foreach my $language (keys %{$strings{$stringName}}) {
 				
-				next if $language ne 'EN' && $strings{$stringName}->{$language} eq $strings{$stringName}->{EN};
+				next if $language ne 'EN' && $strings{$stringName}->{$language} && $strings{$stringName}->{EN} && $strings{$stringName}->{$language} eq $strings{$stringName}->{EN};
 				
 				# try to replace the translation...
 				if ($stringsToTranslate !~ s/^(\t$language\t).+?$/$1$strings{$stringName}->{$language}/ism) {
