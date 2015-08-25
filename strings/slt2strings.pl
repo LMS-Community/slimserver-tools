@@ -17,52 +17,17 @@ if ($args->{format} eq 'json') {
 }
 
 my %strings;
-my $debug = 1;
+my $debug = 0;
+
+my $dirname = rel2abs('.');
 
 # TODO: make input folder configurable
-my $dirname = rel2abs('.');
-opendir(DIR, $dirname) or die "can't opendir $dirname: $!";
-
-my $fileFilter = join('|', @{$args->{'langs'}});
-$fileFilter = qr/-($fileFilter)\.txt$/i;
-
-# process all *-{Language ID}.txt files
-while (defined (my $sltFile = readdir(DIR))) {
-
-	next unless $sltFile =~ $fileFilter;
-	my $lang = uc($1);
-
-	print "Reading $sltFile...\n" if ($debug);
-
-	open(MYSTRINGS, "<:utf8", $sltFile) or (warn "Couldn't open $sltFile for reading: $!\n" && next);
-	binmode MYSTRINGS;
-
-	foreach (<MYSTRINGS>) {
-		chomp;
-
-		if (/^(.*)__(.*?)\t(.*)$/) {
-			
-			my ($token, $string) = ($2, $3);
-
-			print "Duplicate value? $1, $token, $lang\n" if ($strings{$token}{$lang});
-
-			($string) = split /\t/, $string;
-			$string =~ s/\s+$//;
-
-			# Bug 8613: make sure a space is prepended on JIVE_ALLOWEDCHARS* strings
-			if ($token && $token =~ /^ALLOWEDCHARS/) {
-				if ($string =~ /^\S/) {
-					$string = ' ' . $string;
-				}
-			}
-
-			$strings{$token}{$lang} = $string;
-		}
-	}
-	close(MYSTRINGS);
-
+if ( $args->{'custom-strings'} ) {
+	parseStringsFile($args, catdir($args->{dir}, 'custom-strings.txt'));
 }
-closedir(DIR);
+else {
+	parseSLTFiles($args, $dirname);
+}
 
 # search target folder for strings files
 if ($args->{format} eq 'json') {
@@ -105,12 +70,14 @@ else {
 	}
 	
 	find sub {
+		return unless keys %strings;
+		
 		my $stringsFile = $File::Find::name;
 		my $shortName = $_;
 	
-		if (grep { $stringsFile =~ /$_$/ } @defaultStringfiles) {
+		if ( $_ ne 'custom-strings.txt' && grep { $stringsFile =~ /$_$/ } @defaultStringfiles ) {
 	
-			print "Processing $stringsFile\n" if ($debug);
+			print "Processing $stringsFile\n"; # if ($debug);
 	
 			if (-w $stringsFile) {
 	
@@ -169,6 +136,126 @@ else {
 
 1;
 
+# copied from Slim::Utils::Strings
+sub parseStringsFile {
+	my ($args, $file) = @_;
+	
+	# Force the UTF-8 layer opening of the strings file.
+	open(my $fh, $file) || do {
+		die "Couldn't open $file - FATAL!";
+	};
+	
+	my $string = '';
+	my $language = '';
+	my $stringname = '';
+	my $stringData = {};
+	my $ln = 0;
+
+	my $storeString = sub {
+		my ($token, $translations) = @_;
+		
+		foreach my $k (keys %$translations) {
+			my $v = $translations->{$k};
+			next unless defined($k) && defined($v);
+			
+			$k = 'ZH_CN' if $k eq 'ZH_HANS';
+			
+			$strings{$token} ||= {};
+			$strings{$token}->{$k} = $v;
+		}
+	};
+
+	LINE: for my $line ( <$fh> ) {
+
+		$ln++;
+
+		# skip lines starting with # (comments?)
+		next if $line =~ /^#/;
+		# skip lines containing nothing but whitespace
+		# (this includes empty lines)
+		next if $line !~ /\S/;
+
+		if ($line =~ /^(\S+)$/) {
+
+			$storeString->($stringname, $stringData);
+
+			$stringname = $1;
+			$stringData = {};
+			$string = '';
+			next LINE;
+
+		} elsif ($line =~ /^\t(\S*)\t(.+)$/) {
+
+			my $one = $1;
+			$string = $2;
+
+			if ($one =~ /./) {
+				$language = uc($one);
+			}
+
+			if (defined $stringData->{$language}) {
+				$stringData->{$language} .= "\n$string";
+			} else {
+				$stringData->{$language} = $string;
+			}
+
+		} else {
+
+			warn "Parsing line $ln: $line";
+		}
+	}
+
+	$storeString->($stringname, $stringData) if $stringname && keys %$stringData;
+	
+	close $fh;
+}
+
+sub parseSLTFiles {
+	my ($args, $dirname) = @_;
+	
+	opendir(DIR, $dirname) or die "can't opendir $dirname: $!";
+	
+	my $fileFilter = join('|', @{$args->{'langs'}});
+	$fileFilter = qr/-($fileFilter)\.txt$/i;
+	
+	# process all *-{Language ID}.txt files
+	while (defined (my $sltFile = readdir(DIR))) {
+	
+		next unless $sltFile =~ $fileFilter;
+		my $lang = uc($1);
+	
+		print "Reading $sltFile...\n" if ($debug);
+	
+		open(MYSTRINGS, "<:utf8", $sltFile) or (warn "Couldn't open $sltFile for reading: $!\n" && next);
+		binmode MYSTRINGS;
+	
+		foreach (<MYSTRINGS>) {
+			chomp;
+	
+			if (/^(.*)__(.*?)\t(.*)$/) {
+				
+				my ($token, $string) = ($2, $3);
+	
+				print "Duplicate value? $1, $token, $lang\n" if ($strings{$token}{$lang});
+	
+				($string) = split /\t/, $string;
+				$string =~ s/\s+$//;
+	
+				# Bug 8613: make sure a space is prepended on JIVE_ALLOWEDCHARS* strings
+				if ($token && $token =~ /^ALLOWEDCHARS/) {
+					if ($string =~ /^\S/) {
+						$string = ' ' . $string;
+					}
+				}
+	
+				$strings{$token}{$lang} = $string;
+			}
+		}
+		close(MYSTRINGS);
+	
+	}
+	closedir(DIR);
+}
 
 sub getTmpFile {
 	my $shortName = shift;
@@ -215,7 +302,7 @@ sub mergeCustomStrings {
 		if (($stringName !~ /(?:#|\s)/) && defined $strings{$stringName}) {
 			foreach my $language (keys %{$strings{$stringName}}) {
 				
-				next if $language ne 'EN' && $strings{$stringName}->{$language} eq $strings{$stringName}->{EN};
+				next if $language ne 'EN' && $strings{$stringName}->{EN} && $strings{$stringName}->{$language} eq $strings{$stringName}->{EN};
 				
 				# try to replace the translation...
 				if ($stringsToTranslate !~ s/^(\t$language\t).+?$/$1$strings{$stringName}->{$language}/ism) {
@@ -317,6 +404,8 @@ usage: slt2strings.pl (--langs '...') (--format=[iss|json|txt]) (--quiet) --dir 
 
 	argument to --langs is a list of languages to check for translation 
 		(defaults to @defaultLanguages)\n
+
+	--customstrings - read a local custom-strings.txt file rather than SLT files
 		
 	--format=iss will merge the files in the InnoSetup Strings file format
 	--format=json will dump a json file of the language hash
@@ -331,6 +420,7 @@ usage: slt2strings.pl (--langs '...') (--format=[iss|json|txt]) (--quiet) --dir 
 		'quiet'   => \$quiet,
 		'dir=s'   => \$args{'dir'},
 		'format=s'=> \$args{'format'},
+		'customstrings' => \$args{'custom-strings'},
 	);
 
 	if ($args{'help'} || !$args{'dir'}) {
@@ -345,7 +435,7 @@ usage: slt2strings.pl (--langs '...') (--format=[iss|json|txt]) (--quiet) --dir 
 
 	$debug = !$quiet;
 	$args{langs}  = \@langs;
-	$args{format} = lc($args{format});
+	$args{format} = lc($args{format} || 'txt');
 
 	return \%args;
 }
