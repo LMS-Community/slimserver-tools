@@ -191,10 +191,11 @@ sub get_strings_files {
 		my $path = $File::Find::dir;
 
 		if ($file =~ /strings\.(txt|iss|json)$/ 
-			&& $path !~ /\.svn/
+			&& $path !~ /\.(?:svn|git)/
 			&& $path !~ /SqueezePlay\.app/
 			&& $path !~ /Plugins/
 			&& $file !~ /slimservice-strings.txt/
+			&& $file !~ /custom-strings.txt/
 			&& $path !~ /slimserver-strings/) {
 				
 			push @return, $file;
@@ -244,7 +245,7 @@ sub command_args {
 
 	my @langs = @default_supported_langs;
 	if ($args{'langstring'}) {
-		@langs = split/[^A-Z]+/, $args{'langstring'};
+		@langs = split/[^A-Z_]+/, $args{'langstring'};
 	}
 	$args{'langs'} = \@langs;
 

@@ -1,9 +1,10 @@
-[%- FOR file IN data.files %]
-File:[% file %]
+[%- FOR file IN data.files -%]
+[%# File:[% file %]
 [%- FOR string IN data.data.$file.keys %]
+
 [% string %]
 [%- FOR lang IN data.langs %]
 	[% lang %]	[% data.data.$file.$string.$lang %]
-[%- END -%][% END -%]
-[% END -%]
+[%- END -%][% END %]
+[% END %]
 
