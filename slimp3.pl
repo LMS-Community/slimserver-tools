@@ -47,45 +47,50 @@ sub main {
 
 } # end sub main
 
-	# Commands are extracted from the parameters p0, p1, p2, p3, & p4.
-	#   For example:
-	#       http://host/status.html?p0=stop
-	# Both examples above execute a stop command, and sends an html status response
-	#
-	# Command parameters are query parameters named p0, p1, p2, p3 and p4
-	# 	For example:
-	#		http://host/status.m3u?p0=playlist&p1=jump&p2=2 
-	# This example jumps to the second song in the playlist and sends a playlist as the response
-	#
-	# If there are multiple players, then they are specified by the player id
-	#   For example:
-	#		http://host/status.html?p0=mixer&p1=volume&p2=11&player=10.0.1.203:69
-	#
+# Commands are extracted from the parameters p0, p1, p2, p3, & p4.
+#   For example:
+#       http://host/status.html?p0=stop
+# Both examples above execute a stop command, and sends an html status response
+#
+# Command parameters are query parameters named p0, p1, p2, p3 and p4
+# 	For example:
+#		http://host/status.m3u?p0=playlist&p1=jump&p2=2 
+# This example jumps to the second song in the playlist and sends a playlist as the response
+#
+# If there are multiple players, then they are specified by the player id
+#   For example:
+#		http://host/status.html?p0=mixer&p1=volume&p2=11&player=10.0.1.203:69
+#
 sub executeCommand {
     my ($httpaddr, $httpport, $player, $command, $p1, $p2, $p3, $p4) = @_;
     my $urlstring = undef;
 	my $content = undef;
 	
-	$urlstring = "http://$httpaddr:$httpport/status?p0=$command";
+	$urlstring = "http://$httpaddr:$httpport/status.html?p0=$command";
 
     if ( defined($p1) ) {
         $p1 =~s/([^a-zA-Z0-9_\-.])/uc sprintf("%%%02x",ord($1))/eg;
-            $urlstring .= "&p1=" . $p1;
+        $urlstring .= "&p1=" . $p1;
     }
 
     if ( defined($p2) ) {
         $p2 =~s/([^a-zA-Z0-9_\-.])/uc sprintf("%%%02x",ord($1))/eg;
-            $urlstring .= "&p2=" . $p2;
+        $urlstring .= "&p2=" . $p2;
     }
 
     if ( defined($p3) ) {
         $p3 =~s/([^a-zA-Z0-9_\-.])/uc sprintf("%%%02x",ord($1))/eg;
-            $urlstring .= "&p3=" . $p3;
+        $urlstring .= "&p3=" . $p3;
     }
 
     if ( defined($p4) ) {
         $p4 =~s/([^a-zA-Z0-9_\-.])/uc sprintf("%%%02x",ord($1))/eg;
-            $urlstring .= "&p4=" . $p4;
+        $urlstring .= "&p4=" . $p4;
+    }
+
+    if ( defined($player) ) {
+        $player =~s/([^a-zA-Z0-9_\-.])/uc sprintf("%%%02x",ord($1))/eg;
+        $urlstring .= "&player=" . $player;
     }
 
 	$urlstring .= "\n";
@@ -95,7 +100,6 @@ sub executeCommand {
 
 	print $urlstring, "\n";
 
-	
 } # end sub executeCommand
 
 
