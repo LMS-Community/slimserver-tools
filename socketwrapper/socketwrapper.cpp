@@ -79,6 +79,11 @@
 // Version 1.11
 // Fix to stop socketwrapper not shutting down properly when input from stdin and output pipe is closed.
 //
+// ++++++
+// Version 1.12
+// Fix to limit the watchdog on remote stream read. The watchdog will no longer stop the worker thread
+// when waiting for LMS to read data.
+//
 
 #include <process.h>
 #include "stdafx.h"
@@ -105,6 +110,7 @@ typedef struct
 	HANDLE hInput;			// input handle for process/thread
 	HANDLE hOutput;			// output handle for process/thread
 	DWORD WatchDog;			// watchdog for worker threads
+	BOOL bIsWriting;
 	DWORD nBlocks;			// number of "blocks" read
 	DWORD nBytes;			// number of bytes read
 } Stage;
@@ -129,47 +135,47 @@ printUsage() {
 
 #define STRINGLEN 512
 #define STAMPEDMSGLEN (STRINGLEN+32)
-void 
-stderrMsg ( const char *fmt, ...) {
-	    SYSTEMTIME st;
-		va_list ap;
-		char str[STRINGLEN];
-		char stampedmsg[STAMPEDMSGLEN];
+void
+stderrMsg(const char *fmt, ...) {
+	SYSTEMTIME st;
+	va_list ap;
+	char str[STRINGLEN];
+	char stampedmsg[STAMPEDMSGLEN];
 
-		GetLocalTime(&st);
+	GetLocalTime(&st);
 
-		va_start(ap,fmt);
-		vsnprintf_s(str,STRINGLEN,_TRUNCATE, fmt, ap);
-		va_end(ap);
+	va_start(ap, fmt);
+	vsnprintf_s(str, STRINGLEN, _TRUNCATE, fmt, ap);
+	va_end(ap);
 
-		_snprintf_s(stampedmsg,STAMPEDMSGLEN,_TRUNCATE, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d %s", 
-                   st.wYear, st.wMonth,  st.wDay, st.wHour, 
-                   st.wMinute, st.wSecond, st.wMilliseconds,str);
+	_snprintf_s(stampedmsg, STAMPEDMSGLEN, _TRUNCATE, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d %s",
+		st.wYear, st.wMonth, st.wDay, st.wHour,
+		st.wMinute, st.wSecond, st.wMilliseconds, str);
 
-        fputs(stampedmsg,stderr);
-		fflush(stderr);
+	fputs(stampedmsg, stderr);
+	fflush(stderr);
 }
 
-void 
-debugMsg ( const char *fmt, ...) {
-    SYSTEMTIME st;
+void
+debugMsg(const char *fmt, ...) {
+	SYSTEMTIME st;
 	va_list ap;
 
 	char str[STRINGLEN];
 	char stampedmsg[STAMPEDMSGLEN];
 
-	if (bDebug){
-        GetLocalTime(&st);
+	if (bDebug) {
+		GetLocalTime(&st);
 
-        va_start(ap,fmt);
-		vsnprintf_s(str,STRINGLEN,_TRUNCATE, fmt, ap);
+		va_start(ap, fmt);
+		vsnprintf_s(str, STRINGLEN, _TRUNCATE, fmt, ap);
 		va_end(ap);
 
-		_snprintf_s(stampedmsg,STAMPEDMSGLEN,_TRUNCATE, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d %s", 
-                   st.wYear, st.wMonth,  st.wDay, st.wHour, 
-                   st.wMinute, st.wSecond, st.wMilliseconds,str);
+		_snprintf_s(stampedmsg, STAMPEDMSGLEN, _TRUNCATE, "SW: %4d-%02d-%02d %2d:%02d:%02d.%03d %s",
+			st.wYear, st.wMonth, st.wDay, st.wHour,
+			st.wMinute, st.wSecond, st.wMilliseconds, str);
 
-        fputs(stampedmsg,stderr);
+		fputs(stampedmsg, stderr);
 		fflush(stderr);
 
 	}
@@ -183,44 +189,46 @@ debugMsg ( const char *fmt, ...) {
 //  * from the input socket via a pipe to the first process
 //	* from the last process via a pipe to the output socket
 //
-unsigned __stdcall MoveDataThreadProc(void *pv) 
+unsigned __stdcall MoveDataThreadProc(void *pv)
 {
 	Stage *pS = (Stage *)pv;
 	bool fShowDebug = true;
 	DWORD nNummsgs = 0;
 
-	debugMsg ( "MoveDataThreadProc for step %i started.\n", pS->i );
+	debugMsg("MoveDataThreadProc for step %i started.\n", pS->i);
 
 	// if the input handle is for a named pipe then wait for the other end
-	if( pS->fInputIsNamed ){
+	if (pS->fInputIsNamed) {
 
-		if( !ConnectNamedPipe( pS->hInput, NULL) ) {
-			stderrMsg ( "MoveDataThreadProc for step %i failed to attach to named pipe.\n", pS->i );
-			_endthreadex(1); 
+		if (!ConnectNamedPipe(pS->hInput, NULL)) {
+			stderrMsg("MoveDataThreadProc for step %i failed to attach to named pipe.\n", pS->i);
+			_endthreadex(1);
 			return 1;
-		} 
+		}
 
-		debugMsg ( "MoveDataThreadProc for step %i attached to named pipe.\n", pS->i );
+		debugMsg("MoveDataThreadProc for step %i attached to named pipe.\n", pS->i);
 	}
 
 	DWORD bytesread, byteswritten;
+	DWORD wdt_value = 0;
 
-	for(;;)	{
+	for (;;) {
 
-		if( fShowDebug ) {
-			debugMsg ( "MoveDataThreadProc for step %i about to call ReadFile.\n", pS->i );
+		if (fShowDebug) {
+			debugMsg("MoveDataThreadProc for step %i about to call ReadFile.\n", pS->i);
 		}
 
 		// wait for some data from input
-		if( !ReadFile(pS->hInput, pS->pBuff, BUFFER_SIZE, &bytesread, NULL) ) {
-			stderrMsg ( "MoveDataThreadProc for step %i failed reading with error %i.\n", pS->i, GetLastError() );
+		pS->bIsWriting = false;
+		if (!ReadFile(pS->hInput, pS->pBuff, BUFFER_SIZE, &bytesread, NULL)) {
+			stderrMsg("MoveDataThreadProc for step %i failed reading with error %i.\n", pS->i, GetLastError());
 			break;
 		}
 		if (bytesread == 0) {
 			DWORD lasterror = GetLastError();
-			stderrMsg ( "MoveDataThreadProc for step %i read returned 0 bytes with no error. Last Error = %i.\n", pS->i, lasterror );
+			stderrMsg("MoveDataThreadProc for step %i read returned 0 bytes with no error. Last Error = %i.\n", pS->i, lasterror);
 			if (lasterror != 0) break;
-		// So no error and 0 bytes this means EOF so terminate the thread. 
+			// So no error and 0 bytes this means EOF so terminate the thread. 
 			break;
 
 		}
@@ -230,25 +238,27 @@ unsigned __stdcall MoveDataThreadProc(void *pv)
 		pS->nBlocks++;
 
 		// log when data starts
-		if( fShowDebug ) {
-			debugMsg ( "MoveDataThreadProc for step %i got %i bytes, about to write data.\n", pS->i, bytesread );
+		if (fShowDebug) {
+			debugMsg("MoveDataThreadProc for step %i got %i bytes, about to write data.\n", pS->i, bytesread);
 			nNummsgs++;
 		}
 
 		// pass data to output
-		if (!pS->fOutputIsSocket){
-			if( !WriteFile(pS->hOutput, pS->pBuff, bytesread, &byteswritten, NULL) ) {
-				stderrMsg ( "MoveDataThreadProc for step %i failed WriteFile with error %i.\n", pS->i, GetLastError() );
+		pS->bIsWriting = true;
+		if (!pS->fOutputIsSocket) {
+			if (!WriteFile(pS->hOutput, pS->pBuff, bytesread, &byteswritten, NULL)) {
+				stderrMsg("MoveDataThreadProc for step %i failed WriteFile with error %i.\n", pS->i, GetLastError());
 				break;
 			}
-		} else {
-			byteswritten = send ((SOCKET) pS->hOutput, pS->pBuff, bytesread, 0 );
+		}
+		else {
+			byteswritten = send((SOCKET)pS->hOutput, pS->pBuff, bytesread, 0);
 			if (byteswritten == INVALID_SOCKET) {
-				stderrMsg ( "MoveDataThreadProc for step %i failed Send writing with error %i.\n", pS->i, WSAGetLastError());
+				stderrMsg("MoveDataThreadProc for step %i failed Send writing with error %i.\n", pS->i, WSAGetLastError());
 				break;
 			}
 			if (byteswritten != bytesread) {
-				stderrMsg ( "MoveDataThreadProc for step %i : bytesread=%i byteswritten=%i\n", pS->i, bytesread, byteswritten );
+				stderrMsg("MoveDataThreadProc for step %i : bytesread=%i byteswritten=%i\n", pS->i, bytesread, byteswritten);
 				break;
 			}
 		}
@@ -260,20 +270,21 @@ unsigned __stdcall MoveDataThreadProc(void *pv)
 		if (nNummsgs > 1 && !bDebugVerbose) fShowDebug = false;
 	}
 
-
-	debugMsg ( "MoveDataThreadProc for step %i ending.\n", pS->i );
+	pS->bIsWriting = false;
+	debugMsg("MoveDataThreadProc for step %i ending.\n", pS->i);
 	if (!pS->fOutputIsSocket) {
 		if (!FlushFileBuffers(pS->hOutput)) {
-			stderrMsg ( "Error Flushing Output in Thread for step %d: %d\n", pS->i, GetLastError());
-		} 
-	} else {
-		shutdown((SOCKET) pS->hOutput, SD_SEND);
+			stderrMsg("Error Flushing Output in Thread for step %d: %d\n", pS->i, GetLastError());
+		}
 	}
-	if(!CloseHandle(pS->hOutput )) {
-		stderrMsg ( "CloseHandle for step %i failed with error %i.\n", pS->i, GetLastError() );
+	else {
+		shutdown((SOCKET)pS->hOutput, SD_SEND);
 	}
- 
-	_endthreadex(0); 
+	if (!CloseHandle(pS->hOutput)) {
+		stderrMsg("CloseHandle for step %i failed with error %i.\n", pS->i, GetLastError());
+	}
+
+	_endthreadex(0);
 	return 0;
 }
 
@@ -285,59 +296,59 @@ DWORD main(int argc, char **argv)
 	SOCKET inputSocket = INVALID_SOCKET, outputSocket = INVALID_SOCKET;
 	LPSTR command = NULL;
 	DWORD ret = 0;
-	
+
 	// Parse the command line arguments
 	char c;
 	while ((c = getopt(argc, argv, "i:o:c:wdD")) != EOF) {
-		switch(c) {
-			case 'i':
-				inputPort = atoi(optarg);
-				break;
-			case 'o':
-				outputPort = atoi(optarg);
-				break;
-			case 'c':
-				command = optarg;
-				break;
-			case 'w':
-				bWatchdogEnabled = true;
-				break;
-			case 'd':
-				bDebug = true;
-				break;
-			case 'D':
-				bDebug = true;
-				bDebugVerbose = true;
-				break;
-			case '\0':
-				printUsage();
-				return -1;
+		switch (c) {
+		case 'i':
+			inputPort = atoi(optarg);
+			break;
+		case 'o':
+			outputPort = atoi(optarg);
+			break;
+		case 'c':
+			command = optarg;
+			break;
+		case 'w':
+			bWatchdogEnabled = true;
+			break;
+		case 'd':
+			bDebug = true;
+			break;
+		case 'D':
+			bDebug = true;
+			bDebugVerbose = true;
+			break;
+		case '\0':
+			printUsage();
+			return -1;
 		}
 	}
 
-	debugMsg ( SW_ID );
+	debugMsg(SW_ID);
 
 	if (!command) {
 		printUsage();
 		return -1;
 	}
 
-	debugMsg( "-i %i -o %i -c %s\n", inputPort, outputPort, command );
+	debugMsg("-i %i -o %i -c %s\n", inputPort, outputPort, command);
 
 	// Initialize Winsock
-	WORD wVersionRequested = MAKEWORD( 1, 1 );
+	WORD wVersionRequested = MAKEWORD(1, 1);
 	WSADATA wsaData;
-	int err = WSAStartup( wVersionRequested, &wsaData );
-	if ( err != 0 ) {
-		stderrMsg( " Couldn't initialize winsock\n");
+	int err = WSAStartup(wVersionRequested, &wsaData);
+	if (err != 0) {
+		stderrMsg(" Couldn't initialize winsock\n");
 		return -1;
 	}
 
 	// reset our arrays
 	int numSteps = 0;
 
-	Stage info[MAX_STEPS] = {0};
-	HANDLE hChild[MAX_STEPS] = {0};
+	Stage info[MAX_STEPS] = { 0 };
+	HANDLE hChild[MAX_STEPS] = { 0 };
 
 	// count processes to spawn
 	int numProcesses = 0;
@@ -348,16 +359,16 @@ DWORD main(int argc, char **argv)
 	}
 
 	// input socket - use via unnamed pipe and worker thread
-	if( inputPort )
+	if (inputPort)
 	{
-		debugMsg ( "Input from socket ...\n");
+		debugMsg("Input from socket ...\n");
 		struct sockaddr_in addr;
 		addr.sin_family = AF_INET;
 		addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
 		inputSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
 		if (inputSocket == INVALID_SOCKET) {
-			stderrMsg( " Input socket creation error: %d\n", WSAGetLastError());
+			stderrMsg(" Input socket creation error: %d\n", WSAGetLastError());
 			ret = -1;
 			goto tidy;
 		}
@@ -367,73 +378,73 @@ DWORD main(int argc, char **argv)
 
 		addr.sin_port = htons(inputPort);
 		if (connect(inputSocket, (const sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
-			stderrMsg( " input socket connection error: %d\n", WSAGetLastError());
+			stderrMsg(" input socket connection error: %d\n", WSAGetLastError());
 			ret = -1;
 			goto tidy;
 		}
 
-		debugMsg ( "Input socket connected OK.\n");
+		debugMsg("Input socket connected OK.\n");
 
 		info[numSteps].hInput = (HANDLE)inputSocket;
 		info[numSteps].fIsWorkerThread = true;
 		info[numSteps].fInputIsNamed = false;
 		info[numSteps].fOutputIsSocket = false;
-		
-		SECURITY_ATTRIBUTES saAttr; 
-		saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
-		saAttr.bInheritHandle = TRUE; 
-		saAttr.lpSecurityDescriptor = NULL; 
-		
-		if (!CreatePipe(&(info[numSteps+1].hInput),
-						&(info[numSteps].hOutput), 
-						&saAttr, 0)){
-			stderrMsg ( "Input socket pipe creation error: %d\n", GetLastError());
+
+		SECURITY_ATTRIBUTES saAttr;
+		saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+		saAttr.bInheritHandle = TRUE;
+		saAttr.lpSecurityDescriptor = NULL;
+
+		if (!CreatePipe(&(info[numSteps + 1].hInput),
+			&(info[numSteps].hOutput),
+			&saAttr, 0)) {
+			stderrMsg("Input socket pipe creation error: %d\n", GetLastError());
 			ret = -1;
 			goto tidy;
 		}
 
-		debugMsg ( "Input socket pipe created OK.\n");
+		debugMsg("Input socket pipe created OK.\n");
 		++numSteps;
 	}
-	else{
+	else {
 		info[numSteps].hInput = GetStdHandle(STD_INPUT_HANDLE);
 	}
 
 	// command line
 	token = command;
-	for (int i = 0; i < numProcesses; i++) 
+	for (int i = 0; i < numProcesses; i++)
 	{
-		while( *token==' ' ) ++token;
+		while (*token == ' ') ++token;
 
 		LPSTR p = strstr(token, PIPE_TOKEN);
 
 		if (p != NULL) // PIPE_TOKEN found
 		{
 			LPSTR p2 = p;
-			char pszNP[sizeof(PIPE_NAME_ROOT)+8];
-			sprintf( pszNP, "%s%06d", PIPE_NAME_ROOT, getpid() );
-			size_t n = strlen(token)+strlen(PIPE_NAME_ROOT)+8;
+			char pszNP[sizeof(PIPE_NAME_ROOT) + 8];
+			sprintf(pszNP, "%s%06d", PIPE_NAME_ROOT, getpid());
+			size_t n = strlen(token) + strlen(PIPE_NAME_ROOT) + 8;
 			info[numSteps].pBuff = (char *)malloc(n);
-			if( info[numSteps].pBuff == NULL) {
-				stderrMsg ( "pBuff malloc failed\n");
+			if (info[numSteps].pBuff == NULL) {
+				stderrMsg("pBuff malloc failed\n");
 				ret = -1;
 				goto tidy;
 			}
 
-			p = p+strlen( PIPE_TOKEN );
-			*p2='\0';
-			sprintf((char *)info[numSteps].pBuff, "%s%s%s", token, pszNP, p); 
-			*p2='#';
-			info[numSteps+1].hInput = CreateNamedPipe( pszNP,
-							PIPE_ACCESS_INBOUND,
-							PIPE_TYPE_BYTE|PIPE_WAIT,
-							1,
-							BUFFER_SIZE,
-							BUFFER_SIZE,
-							INFINITE,
-							NULL);
-			if(info[numSteps+1].hInput == INVALID_HANDLE_VALUE) {
-				stderrMsg ( "Error Creating Named Pipe: %d\n", GetLastError());
+			p = p + strlen(PIPE_TOKEN);
+			*p2 = '\0';
+			sprintf((char *)info[numSteps].pBuff, "%s%s%s", token, pszNP, p);
+			*p2 = '#';
+			info[numSteps + 1].hInput = CreateNamedPipe(pszNP,
+				PIPE_ACCESS_INBOUND,
+				PIPE_TYPE_BYTE | PIPE_WAIT,
+				1,
+				BUFFER_SIZE,
+				BUFFER_SIZE,
+				INFINITE,
+				NULL);
+			if (info[numSteps + 1].hInput == INVALID_HANDLE_VALUE) {
+				stderrMsg("Error Creating Named Pipe: %d\n", GetLastError());
 				ret = -1;
 				goto tidy;
 			}
@@ -444,36 +455,37 @@ DWORD main(int argc, char **argv)
 			info[numSteps].fInputIsNamed = true;
 			info[numSteps].fOutputIsSocket = false;
 
-		} else {  // no PIPE_TOKEN
-			info[numSteps].pBuff = (char *)malloc(strlen(token)+1);
-			if( info[numSteps].pBuff == NULL) {
-				stderrMsg ( "malloc failed\n");
+		}
+		else {  // no PIPE_TOKEN
+			info[numSteps].pBuff = (char *)malloc(strlen(token) + 1);
+			if (info[numSteps].pBuff == NULL) {
+				stderrMsg("malloc failed\n");
 				ret = -1;
 				goto tidy;
 			}
-			strcpy( (char *)info[numSteps].pBuff, token );
+			strcpy((char *)info[numSteps].pBuff, token);
 		}
 
-		if ( i != numProcesses - 1 || outputPort ) {
+		if (i != numProcesses - 1 || outputPort) {
 
-			SECURITY_ATTRIBUTES saAttr; 
-			saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
-			saAttr.bInheritHandle = TRUE; 
-			saAttr.lpSecurityDescriptor = NULL; 
-			
-			if (!CreatePipe(&(info[numSteps+1].hInput),
-							&(info[numSteps].hOutput), 
-							&saAttr, 0)){
-				stderrMsg ( "Error Creating Pipe: %d\n", GetLastError());
+			SECURITY_ATTRIBUTES saAttr;
+			saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+			saAttr.bInheritHandle = TRUE;
+			saAttr.lpSecurityDescriptor = NULL;
+
+			if (!CreatePipe(&(info[numSteps + 1].hInput),
+				&(info[numSteps].hOutput),
+				&saAttr, 0)) {
+				stderrMsg("Error Creating Pipe: %d\n", GetLastError());
 				ret = -1;
 				goto tidy;
 			}
 		}
 
 		// last process
-		if ( i == numProcesses - 1 ) {
+		if (i == numProcesses - 1) {
 
-			if ( outputPort ){
+			if (outputPort) {
 				// anon pipe already done
 				// open socket
 				++numSteps;
@@ -483,7 +495,7 @@ DWORD main(int argc, char **argv)
 
 				outputSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
 				if (outputSocket == INVALID_SOCKET) {
-					stderrMsg ( "Error creating output socket: %d\n", WSAGetLastError());
+					stderrMsg("Error creating output socket: %d\n", WSAGetLastError());
 					ret = -1;
 					goto tidy;
 				}
@@ -494,15 +506,15 @@ DWORD main(int argc, char **argv)
 				addr.sin_family = AF_INET;
 				addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 				addr.sin_port = htons(outputPort);
-				if (connect(outputSocket, (const sockaddr*)&addr, 
-							sizeof(addr)) == SOCKET_ERROR) {
-					stderrMsg ( "Error connecting to output socket: %d\n", WSAGetLastError());
+				if (connect(outputSocket, (const sockaddr*)&addr,
+					sizeof(addr)) == SOCKET_ERROR) {
+					stderrMsg("Error connecting to output socket: %d\n", WSAGetLastError());
 					ret = -1;
 					goto tidy;
 				}
 				info[numSteps].hOutput = (HANDLE)outputSocket;
 			}
-			else{
+			else {
 				info[numSteps].hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 			}
 		}
@@ -513,32 +525,32 @@ DWORD main(int argc, char **argv)
 	}
 
 	// debugging
-	debugMsg ( "Init complete.\n" );
-	debugMsg ( "# =input== =output= ==type== ===details===\n" );
-	for( int i=0; i<numSteps; ++i ){
+	debugMsg("Init complete.\n");
+	debugMsg("# =input== =output= ==type== ===details===\n");
+	for (int i = 0; i<numSteps; ++i) {
 		info[i].i = i;
-		if( info[i].fIsWorkerThread )
-			debugMsg ( "%1x %08x %08x  THREAD  %s%s\n", i, info[i].hInput, info[i].hOutput, (info[i].fInputIsNamed ? "Named Pipe" : ""), (info[i].fOutputIsSocket ? "Output Socket" : ""));
+		if (info[i].fIsWorkerThread)
+			debugMsg("%1x %08x %08x  THREAD  %s%s\n", i, info[i].hInput, info[i].hOutput, (info[i].fInputIsNamed ? "Named Pipe" : ""), (info[i].fOutputIsSocket ? "Output Socket" : ""));
 		else
-			debugMsg ( "%1x %08x %08x  PROCESS %s\n" ,i, info[i].hInput, info[i].hOutput, info[i].pBuff );
+			debugMsg("%1x %08x %08x  PROCESS %s\n", i, info[i].hInput, info[i].hOutput, info[i].pBuff);
 	}
-	
+
 	// turn on the pumps
-	for( int i = 0; i < numSteps; ++i ){
-		if( info[i].fIsWorkerThread )
+	for (int i = 0; i < numSteps; ++i) {
+		if (info[i].fIsWorkerThread)
 		{
 			info[i].pBuff = (char *)malloc(BUFFER_SIZE);
-			if( info[i].pBuff == NULL) {
-				stderrMsg ( "malloc failed for step %d \n",i);
+			if (info[i].pBuff == NULL) {
+				stderrMsg("malloc failed for step %d \n", i);
 				ret = -1;
 				goto tidy;
 			}
 
 			hChild[i] = (HANDLE)_beginthreadex(NULL, 0, &MoveDataThreadProc, &info[i], 0, NULL);
-			if( hChild[i] ) 
+			if (hChild[i])
 			{
-				if (!SetThreadPriority( hChild[i], THREAD_PRIORITY_TIME_CRITICAL)) {
-					stderrMsg ( "Error changing thread priority for step %d : %d\n",i, GetLastError());
+				if (!SetThreadPriority(hChild[i], THREAD_PRIORITY_TIME_CRITICAL)) {
+					stderrMsg("Error changing thread priority for step %d : %d\n", i, GetLastError());
 					ret = -1;
 					goto tidy;
 				}
@@ -548,38 +560,38 @@ DWORD main(int argc, char **argv)
 	}
 
 	// and turn on the taps
-	for( int i = 0; i < numSteps; ++i ){
-		if( !info[i].fIsWorkerThread )
+	for (int i = 0; i < numSteps; ++i) {
+		if (!info[i].fIsWorkerThread)
 		{
 			STARTUPINFO siStartInfo;
-			PROCESS_INFORMATION piProcInfo; 
-	
+			PROCESS_INFORMATION piProcInfo;
+
 			ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
 			ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
 
-			siStartInfo.cb = sizeof(STARTUPINFO); 
+			siStartInfo.cb = sizeof(STARTUPINFO);
 
 			siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 			siStartInfo.hStdInput = info[i].hInput;
 			siStartInfo.hStdOutput = info[i].hOutput;
 			siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
-			if( !CreateProcess(NULL, info[i].pBuff,
-								  NULL, // process security attributes 
-								  NULL, // primary thread security attributes 
-								  TRUE, // handles are inherited 
-								  0,    // creation flags 
-								  NULL, // use parent's environment 
-								  NULL, // use parent's current directory 
-								  &siStartInfo,  // STARTUPINFO pointer 
-								  &piProcInfo)) {  // receives PROCESS_INFORMATION 
-				stderrMsg ( "Error Creating Process for step %d: %d\n", i, GetLastError());
+			if (!CreateProcess(NULL, info[i].pBuff,
+				NULL, // process security attributes 
+				NULL, // primary thread security attributes 
+				TRUE, // handles are inherited 
+				0,    // creation flags 
+				NULL, // use parent's environment 
+				NULL, // use parent's current directory 
+				&siStartInfo,  // STARTUPINFO pointer 
+				&piProcInfo)) {  // receives PROCESS_INFORMATION 
+				stderrMsg("Error Creating Process for step %d: %d\n", i, GetLastError());
 				ret = -1;
 				goto tidy;
 			}
-		
+
 			hChild[i] = piProcInfo.hProcess;
-			CloseHandle( piProcInfo.hThread );
+			CloseHandle(piProcInfo.hThread);
 			if (info[i].hOutput != GetStdHandle(STD_ERROR_HANDLE))
 				CloseHandle(info[i].hOutput);
 		}
@@ -588,20 +600,20 @@ DWORD main(int argc, char **argv)
 	bool fDie = false;
 	DWORD deadstep = -1;
 
-	while( !fDie )	{
-		DWORD wr = WaitForMultipleObjects( numSteps, hChild, FALSE, bDebug ? DEBUG_TIMEOUT : TIMEOUT );
-		if( wr!=WAIT_TIMEOUT ) {
-			deadstep = wr-WAIT_OBJECT_0;
-			stderrMsg( "Timeout Process/Thread for step %i died.\n", deadstep );
+	while (!fDie) {
+		DWORD wr = WaitForMultipleObjects(numSteps, hChild, FALSE, bDebug ? DEBUG_TIMEOUT : TIMEOUT);
+		if (wr != WAIT_TIMEOUT) {
+			deadstep = wr - WAIT_OBJECT_0;
+			stderrMsg("Timeout Process/Thread for step %i died.\n", deadstep);
 			fDie = true;
 		}
-		for( int i=0; i<numSteps; ++i ){
-			if( info[i].fIsWorkerThread ){
-				if( 0==info[i].WatchDog ) {
-					stderrMsg( "Watchdog expired - Thread for step %i stalled.\n", i );
+		for (int i = 0; i<numSteps; ++i) {
+			if (info[i].fIsWorkerThread) {
+				if (0 == info[i].WatchDog && !info[i].bIsWriting) {
+					stderrMsg("Watchdog expired - Thread for step %i stalled.\n", i);
 					if (bWatchdogEnabled)	fDie = true;
 				}
-				info[i].WatchDog=0;
+				info[i].WatchDog = 0;
 			}
 		}
 	}
@@ -610,63 +622,67 @@ tidy:
 	DWORD wr;
 	DWORD waittimeout = 2000; // Wait time for process / thread to pass remaining bytes in buffer.
 
-	debugMsg ( "Tidying up \n"); 
+	debugMsg("Tidying up \n");
 	if (deadstep == 0) {
-		debugMsg ( " Normal source all read: Process 0 ended \n" );
-	} else {
-		if (deadstep != -1) debugMsg ( " Process/thread %d stopped\n", deadstep );
-		if ((deadstep +1) == numSteps) {
-				debugMsg ( " Output Process/thread %d stopped\n", deadstep );
-				waittimeout = 50 ; // Make shutdown faster if last process has stopped since no more bytes can be sent to output
-		}
-		if (fDie) debugMsg ( "Watchdog expired \n"); 
+		debugMsg(" Normal source all read: Process 0 ended \n");
 	}
-	for( int i = 0; i < numSteps; ++i ){
-		if( info[i].fIsWorkerThread ){
-				wr = WaitForSingleObject( hChild[i],waittimeout );
-				if( wr==WAIT_TIMEOUT ) {
-					stderrMsg( "Tidying up - Thread for step %d hasn't died.\n", i );
-				} else if( wr==WAIT_FAILED ) {
-					stderrMsg ( "Tidying up - Wait for thread to die failed for step  %d: %d\n", i, GetLastError());
-				}
-				debugMsg("Thread for step %i streamed %6i blocks totalling %08X (%d) bytes\n",i, info[i].nBlocks , info[i].nBytes, info[i].nBytes );
-			} else {
-			debugMsg("Waiting for process step %i to terminate\n",i);
-			wr = WaitForSingleObject( hChild[i], 2000 );
-			if( wr==WAIT_TIMEOUT || wr==WAIT_FAILED ) {
-				stderrMsg( "Tidying up - process for step %d hasn't died or wait failed. wr=%d :%d \n", i,wr, GetLastError() );
-				if( hChild[i] ) {
-					if (!TerminateProcess( hChild[i], 0 ) )
-						stderrMsg ( "Error Terminating Process for step %d: %d\n", i, GetLastError());
+	else {
+		if (deadstep != -1) debugMsg(" Process/thread %d stopped\n", deadstep);
+		if ((deadstep + 1) == numSteps) {
+			debugMsg(" Output Process/thread %d stopped\n", deadstep);
+			waittimeout = 50; // Make shutdown faster if last process has stopped since no more bytes can be sent to output
+		}
+		if (fDie) debugMsg("Watchdog expired \n");
+	}
+	for (int i = 0; i < numSteps; ++i) {
+		if (info[i].fIsWorkerThread) {
+			wr = WaitForSingleObject(hChild[i], waittimeout);
+			if (wr == WAIT_TIMEOUT) {
+				stderrMsg("Tidying up - Thread for step %d hasn't died.\n", i);
+			}
+			else if (wr == WAIT_FAILED) {
+				stderrMsg("Tidying up - Wait for thread to die failed for step  %d: %d\n", i, GetLastError());
+			}
+			debugMsg("Thread for step %i streamed %6i blocks totalling %08X (%d) bytes\n", i, info[i].nBlocks, info[i].nBytes, info[i].nBytes);
+		}
+		else {
+			debugMsg("Waiting for process step %i to terminate\n", i);
+			wr = WaitForSingleObject(hChild[i], 2000);
+			if (wr == WAIT_TIMEOUT || wr == WAIT_FAILED) {
+				stderrMsg("Tidying up - process for step %d hasn't died or wait failed. wr=%d :%d \n", i, wr, GetLastError());
+				if (hChild[i]) {
+					if (!TerminateProcess(hChild[i], 0))
+						stderrMsg("Error Terminating Process for step %d: %d\n", i, GetLastError());
 				}
 			}
 		}
-		if( info[i].pBuff ) free( info[i].pBuff );
+		if (info[i].pBuff) free(info[i].pBuff);
 	}
 
-//
-//  Now that all processes are terminated - check if any threads are still running and end them as well.
-//
+	//
+	//  Now that all processes are terminated - check if any threads are still running and end them as well.
+	//
 
-	for( int i = 0; i < numSteps; ++i ){
-		if( info[i].fIsWorkerThread ){
+	for (int i = 0; i < numSteps; ++i) {
+		if (info[i].fIsWorkerThread) {
 			DWORD threadExitCode;
-			if (GetExitCodeThread(hChild[i],&threadExitCode)) {
-				if (threadExitCode == STILL_ACTIVE){
-					debugMsg("Exitcode for Thread %i Code=%d\n",i,threadExitCode);
-					if(!TerminateThread(hChild[i], 2)) {
-						stderrMsg ( "Error trying to TerminateThread for step %d: %d\n", i, GetLastError());
+			if (GetExitCodeThread(hChild[i], &threadExitCode)) {
+				if (threadExitCode == STILL_ACTIVE) {
+					debugMsg("Exitcode for Thread %i Code=%d\n", i, threadExitCode);
+					if (!TerminateThread(hChild[i], 2)) {
+						stderrMsg("Error trying to TerminateThread for step %d: %d\n", i, GetLastError());
 					}
 				}
-			} else {
-				stderrMsg ( "Error GetExitThreadCode for step %d: %d\n", i, GetLastError());
+			}
+			else {
+				stderrMsg("Error GetExitThreadCode for step %d: %d\n", i, GetLastError());
 			}
 			CloseHandle(hChild[i]); // CloseHandle is required because _beginthreadex was used.
 		}
 	}
 
-	if( outputSocket ) closesocket( outputSocket );
-	if( inputSocket )  closesocket( inputSocket );
+	if (outputSocket) closesocket(outputSocket);
+	if (inputSocket)  closesocket(inputSocket);
 	FlushFileBuffers(GetStdHandle(STD_OUTPUT_HANDLE));
 	debugMsg("Socketwrapper has terminated.\n\n");
 	return 0;
