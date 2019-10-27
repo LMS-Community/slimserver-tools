@@ -604,7 +604,7 @@ DWORD main(int argc, char **argv)
 			fDie = true;
 		}
 		for( int i=0; i<numSteps; ++i ){
-			if( info[i].fIsWorkerThread && !info[i].bIsWriting){
+			if( info[i].fIsWorkerThread && !info[i].bIsWriting ){
 				if( 0==info[i].WatchDog ) {
 					stderrMsg( "Watchdog expired - Thread for step %i stalled.\n", i );
 					if (bWatchdogEnabled)	fDie = true;
