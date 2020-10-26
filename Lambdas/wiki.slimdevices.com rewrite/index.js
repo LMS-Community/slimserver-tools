@@ -8,6 +8,7 @@ exports.handler = async (event) => {
         newuri = newuri + '.html';
 
     newuri = newuri.replace(/\/User:/, '/User_');
+    newuri = newuri.replace(/\/Talk:/, '/Talk_');
 
     request.uri = newuri;
 
