@@ -1,0 +1,7 @@
+RewriteBase /releases
+
+RewriteRule ^7\.9\.4/servers.xml /nightly/index.php?ver=7.9&format=xml
+RewriteRule ^8.*/servers.xml /nightly/index.php?ver=8.0&format=xml
+
+RewriteRule ^7\.9\..*/servers.xml latest.xml
+

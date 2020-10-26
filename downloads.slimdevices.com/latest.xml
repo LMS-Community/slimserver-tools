@@ -1,0 +1,17 @@
+<servers>
+  <deb revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/logitechmediaserver_7.9.3_all.deb" version="7.9.3" />
+  <debamd64 revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/logitechmediaserver_7.9.3_amd64.deb" version="7.9.3" />
+  <debarm revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/logitechmediaserver_7.9.3_arm.deb" version="7.9.3" />
+  <debi386 revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/logitechmediaserver_7.9.3_i386.deb" version="7.9.3" />
+  <default revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3" version="7.9.3" />
+  <nocpan revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/logitechmediaserver-7.9.3-noCPAN.tgz" version="7.9.3" />
+  <osx revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/LogitechMediaServer-7.9.3.pkg" version="7.9.3" />
+  <readynas revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/logitechmediaserver-7.9.3-sparc-readynas.bin" version="7.9.3" />
+  <readynasarm revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/logitechmediaserver-7.9.3-arm-readynas.bin" version="7.9.3" />
+  <readynaspro revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/logitechmediaserver-7.9.3-i386-readynas.bin" version="7.9.3" />
+  <rpm revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/logitechmediaserver-7.9.3-1.noarch.rpm" version="7.9.3" />
+  <whs revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/LogitechMediaServer-7.9.3-whs.msi" version="7.9.3" />
+  <win revision="1597753178" url="http://downloads.slimdevices.com/LogitechMediaServer_v7.9.3/LogitechMediaServer-7.9.3.exe" version="7.9.3" />
+</servers>
+
+
