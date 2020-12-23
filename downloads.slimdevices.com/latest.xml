@@ -1,17 +1,14 @@
 <servers>
-  <deb revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/logitechmediaserver_8.0.0_all.deb" version="8.0.0" />
-  <debamd64 revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/logitechmediaserver_8.0.0_amd64.deb" version="8.0.0" />
-  <debarm revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/logitechmediaserver_8.0.0_arm.deb" version="8.0.0" />
-  <debi386 revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/logitechmediaserver_8.0.0_i386.deb" version="8.0.0" />
-  <default revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0" version="8.0.0" />
-  <nocpan revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/logitechmediaserver-8.0.0-noCPAN.tgz" version="8.0.0" />
-  <osx revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/LogitechMediaServer-8.0.0.pkg" version="8.0.0" />
-  <readynas revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/logitechmediaserver-8.0.0-sparc-readynas.bin" version="8.0.0" />
-  <readynasarm revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/logitechmediaserver-8.0.0-arm-readynas.bin" version="8.0.0" />
-  <readynaspro revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/logitechmediaserver-8.0.0-i386-readynas.bin" version="8.0.0" />
-  <rpm revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/logitechmediaserver-8.0.0-1.noarch.rpm" version="8.0.0" />
-  <whs revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/LogitechMediaServer-8.0.0-whs.msi" version="8.0.0" />
-  <win revision="1605892076" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.0.0/LogitechMediaServer-8.0.0.exe" version="8.0.0" />
+  <deb revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0/logitechmediaserver_8.1.0_all.deb" version="8.1.0" />
+  <debamd64 revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0/logitechmediaserver_8.1.0_amd64.deb" version="8.1.0" />
+  <debarm revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0/logitechmediaserver_8.1.0_arm.deb" version="8.1.0" />
+  <debi386 revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0/logitechmediaserver_8.1.0_i386.deb" version="8.1.0" />
+  <default revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0" version="8.1.0" />
+  <nocpan revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0/logitechmediaserver-8.1.0-noCPAN.tgz" version="8.1.0" />
+  <osx revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0/LogitechMediaServer-8.1.0.pkg" version="8.1.0" />
+  <rpm revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0/logitechmediaserver-8.1.0-1.noarch.rpm" version="8.1.0" />
+  <whs revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0/LogitechMediaServer-8.1.0-whs.msi" version="8.1.0" />
+  <win revision="1608700893" url="http://downloads.slimdevices.com/LogitechMediaServer_v8.1.0/LogitechMediaServer-8.1.0.exe" version="8.1.0" />
 </servers>
 
 
