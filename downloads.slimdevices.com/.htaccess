@@ -2,10 +2,11 @@ RewriteBase /releases
 
 #RewriteRule ^7\.9\.4/servers.xml /nightly/xml.php?ver=7.9&xml=1
 #RewriteRule ^8\.0\.1/servers.xml /nightly/xml.php?ver=8.0&xml=1
-RewriteRule ^8\.1\.1/servers.xml /nightly/xml.php?ver=8.1&xml=1
+RewriteRule ^8\.1\.1/servers.xml /nightly/index.php?ver=8.1&xml=1
+RewriteRule ^8\.2\.0/servers.xml /nightly/index.php?ver=8.2&xml=1
 
-RewriteRule ^nightly/stable.xml /nightly/xml.php?ver=8.1&xml=1
-RewriteRule ^nightly/dev.xml /nightly/xml.php?ver=8.2&xml=1
+RewriteRule ^nightly/stable.xml /nightly/index.php?ver=8.1&xml=1
+RewriteRule ^nightly/dev.xml /nightly/index.php?ver=8.2&xml=1
 
 RewriteRule ^8\..*/servers.xml latest.xml
 RewriteRule ^7\.9\..*/servers.xml latest.xml
