@@ -39,6 +39,7 @@ $changelog["7.9"] = "http://htmlpreview.github.io/?https://github.com/Logitech/s
 $changelog["8.0"] = "http://htmlpreview.github.io/?https://github.com/Logitech/slimserver/blob/public/8.0/Changelog8.html";
 $changelog["8.1"] = "http://htmlpreview.github.io/?https://github.com/Logitech/slimserver/blob/public/8.1/Changelog8.html";
 $changelog["8.2"] = "http://htmlpreview.github.io/?https://github.com/Logitech/slimserver/blob/public/8.2/Changelog8.html";
+$changelog["8.3"] = "http://htmlpreview.github.io/?https://github.com/Logitech/slimserver/blob/public/8.3/Changelog8.html";
 $changelog["10.0"] = "http://htmlpreview.github.io/?https://github.com/Logitech/slimserver/blob/public/10.0/Changelog10.html";
 
 $gitlog["7.7"] = "https://github.com/Logitech/slimserver/commits/public/7.7";
@@ -46,6 +47,7 @@ $gitlog["7.9"] = "https://github.com/Logitech/slimserver/commits/public/7.9";
 $gitlog["8.0"] = "https://github.com/Logitech/slimserver/commits/public/8.0";
 $gitlog["8.1"] = "https://github.com/Logitech/slimserver/commits/public/8.1";
 $gitlog["8.2"] = "https://github.com/Logitech/slimserver/commits/public/8.2";
+$gitlog["8.3"] = "https://github.com/Logitech/slimserver/commits/public/8.3";
 $gitlog["10.0"] = "https://github.com/Logitech/slimserver/commits/public/10.0";
 
 $v = $_GET["ver"];
