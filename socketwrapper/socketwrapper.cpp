@@ -88,8 +88,7 @@
 #include <process.h>
 #include "stdafx.h"
 #include "getopt.h"
-
-#define	 SW_ID			  "Socketwrapper 1.11beta\n"
+#define	 SW_ID			  "Socketwrapper 1.12beta\n"
 
 // defines & global vars for extra thread mode
 #define  MAX_STEPS        16
@@ -605,7 +604,7 @@ DWORD main(int argc, char **argv)
 			fDie = true;
 		}
 		for( int i=0; i<numSteps; ++i ){
-			if( info[i].fIsWorkerThread  && !info[i].bIsWriting){
+			if (info[i].fIsWorkerThread && (!info[i].bIsWriting || info[i].fOutputIsSocket))
 				if( 0==info[i].WatchDog ) {
 					stderrMsg( "Watchdog expired - Thread for step %i stalled.\n", i );
 					if (bWatchdogEnabled)	fDie = true;
