@@ -4,7 +4,8 @@
 # LMS
 $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\.exe/"] = "Logitech Media Server: Windows Executable Installer";
 $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\-whs.msi/"] = "Logitech Media Server: Windows Home Server Installer";
-$fileList["/.*\/LogitechMediaServer-.*-[0-9]+\.pkg/"] = "Logitech Media Server: Mac OSX Installer";
+$fileList["/.*\/LogitechMediaServer-[0-9.]*-[0-9]+\.pkg/"] = "Logitech Media Server: Mac OSX Installer";
+$fileList["/.*\/LogitechMediaServer-.*Monterey.*-[0-9]+\.pkg/"] = "Logitech Media Server: Mac OSX Installer";
 $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\.dmg/"] = "Logitech Media Server: Mac OSX Installer";
 $fileList["/.*\/logitechmediaserver-.*-[0-9]+\.tgz/"] = "Logitech Media Server: Unix Tarball (i386, x86_64, i386 FreeBSD, ARM EABI, PowerPC)";
 $fileList["/.*\/logitechmediaserver-.*-[0-9]+-FreeBSD\.tgz/"] = "Logitech Media Server: FreeBSD 7.2 Tarball (i386)";
@@ -133,6 +134,7 @@ function showLatest($version, $fileList) {
 			if (preg_match("/\.exe$/", $best_file))             { $os = 'win'; }
 			elseif (preg_match("/\.msi/", $best_file))          { $os = 'whs'; }
 
+			elseif (preg_match("/Monterey-.*pkg/", $best_file)) { $os = 'osx-ng'; }
 			elseif (preg_match("/\.pkg/", $best_file))          { $os = 'osx'; }
 
 			elseif (preg_match("/amd64\.deb/", $best_file))     { $os = 'debamd64'; }
