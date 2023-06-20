@@ -1,6 +1,6 @@
 RewriteBase /releases
 
-RewriteRule ^8\.3\.1/servers.xml /nightly/index.php?ver=8.3&xml=1
+RewriteRule ^8\.3\.2/servers.xml /nightly/index.php?ver=8.3&xml=1
 RewriteRule ^8\.4\.0/servers.xml /nightly/index.php?ver=8.4&xml=1
 
 RewriteRule ^nightly/stable.xml /nightly/index.php?ver=8.3&xml=1
