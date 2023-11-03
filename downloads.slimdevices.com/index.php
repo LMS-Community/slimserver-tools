@@ -5,35 +5,15 @@
 $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\.exe/"] = "Logitech Media Server: Windows Executable Installer";
 $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\-whs.msi/"] = "Logitech Media Server: Windows Home Server Installer";
 $fileList["/.*\/LogitechMediaServer-[0-9.]*-[0-9]+\.pkg/"] = "Logitech Media Server: Mac OSX Installer";
-$fileList["/.*\/LogitechMediaServer-.*Legacy.*-[0-9]+\.pkg/"] = "Logitech Media Server: Mac OSX Installer (no Apple Silicon support)";
-$fileList["/.*\/LogitechMediaServer-.*-[0-9]+\.dmg/"] = "Logitech Media Server: Mac OSX Installer";
+// $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\.dmg/"] = "Logitech Media Server: Mac OSX Installer";
 $fileList["/.*\/logitechmediaserver-.*-[0-9]+\.tgz/"] = "Logitech Media Server: Unix Tarball (i386, x86_64, i386 FreeBSD, ARM EABI, PowerPC)";
-$fileList["/.*\/logitechmediaserver-.*-[0-9]+-FreeBSD\.tgz/"] = "Logitech Media Server: FreeBSD 7.2 Tarball (i386)";
 $fileList["/.*\/logitechmediaserver-.*-[0-9]+-arm-linux\.tgz/"] = "Logitech Media Server: ARM Linux Tarball (ARM EABI)";
-$fileList["/.*\/logitechmediaserver-.*-[0-9]+-powerpc-linux\.tgz/"] = "Logitech Media Server: PowerPC Linux Tarball (for Perl 5.8-5.14)";
 $fileList["/.*\/logitechmediaserver-.*-[0-9]+\-noCPAN.tgz/"] = "Logitech Media Server: Unix Tarball - No CPAN Libraries";
 $fileList["/.*\/logitechmediaserver.*~[0-9]+_all\.deb/"] = "Logitech Media Server: Debian Installer Package (i386, x86_64, ARM EABI, PowerPC)";
 $fileList["/.*\/logitechmediaserver.*~[0-9]+_amd64\.deb/"] = "Logitech Media Server: Debian Installer Package (x86_64)";
 $fileList["/.*\/logitechmediaserver.*~[0-9]+_arm\.deb/"] = "Logitech Media Server: Debian Installer Package (ARM)";
 $fileList["/.*\/logitechmediaserver.*~[0-9]+_i386\.deb/"] = "Logitech Media Server: Debian Installer Package (i386)";
 $fileList["/.*\/logitechmediaserver-.*-[0-9.]+.[0-9]+\.noarch\.rpm/"] = "Logitech Media Server: RedHat (RPM) Installer Package";
-$fileList["/.*\/logitechmediaserver.*-[0-9]+-sparc-readynas\.bin/"] = "Logitech Media Server: NETGEAR ReadyNas Installer Package (Sparc)";
-$fileList["/.*\/logitechmediaserver.*-[0-9]+-i386-readynas\.bin/"] = "Logitech Media Server: NETGEAR ReadyNas Pro Installer Package (i386) ";
-$fileList["/.*\/logitechmediaserver.*-[0-9]+-arm-readynas\.bin/"] = "Logitech Media Server: NETGEAR ReadyNas Duo/NV V2 Installer (ARM) ";
-
-#UEML
-$fileList["/.*\/UEMusicLibrary-.*-[0-9]+\.exe/"] = "UE Music Library: Windows Executable Installer";
-$fileList["/.*\/UEMusicLibrary-.*-[0-9]+\.pkg/"] = "UE Music Library: Mac OSX Installer";
-$fileList["/.*\/uemusiclibrary.*-[0-9]+-sparc-readynas\.bin/"] = "UE Music Library: NETGEAR ReadyNas Duo/NV Installer (Sparc) ";
-$fileList["/.*\/uemusiclibrary.*-[0-9]+-i386-readynas\.bin/"] = "UE Music Library: NETGEAR ReadyNas Pro Installer (i386) ";
-$fileList["/.*\/uemusiclibrary.*-[0-9]+-arm-readynas\.bin/"] = "UE Music Library: NETGEAR ReadyNas Duo/NV V2 Installer (ARM) ";
-$fileList["/.*\/uemusiclibrary.*~[0-9]+_all\.deb/"] = "UE Music Library: Debian Installer Package (i386, x86_64, ARM EABI, PowerPC)";
-$fileList["/.*\/uemusiclibrary-.*-[0-9.]+.[0-9]+\.noarch\.rpm/"] = "UE Music Library: RedHat (RPM) Installer Package";
-$fileList["/.*\/uemusiclibrary-.*-[0-9]+\.tgz/"] = "UE Music Library: Unix Tarball (for Perl 5.8-5.18, Darwin, i386, x86_64, i386 FreeBSD, ARM EABI, PowerPC)";
-$fileList["/.*\/uemusiclibrary-.*-[0-9]+\-noCPAN.tgz/"] = "UE Music Library: Unix Tarball - No CPAN Libraries";
-$fileList["/.*\/uemusiclibrary-.*-[0-9]+-FreeBSD\.tgz/"] = "UE Music Library: FreeBSD 7.2 Tarball (i386)";
-$fileList["/.*\/uemusiclibrary-.*-[0-9]+-arm-linux\.tgz/"] = "UE Music Library: ARM Linux Tarball (for Perl 5.8-5.14, ARM EABI)";
-$fileList["/.*\/uemusiclibrary-.*-[0-9]+-powerpc-linux\.tgz/"] = "UE Music Library: PowerPC Linux Tarball (for Perl 5.8-5.14)";
 
 $changelog["7.7"] = "http://htmlpreview.github.io/?https://github.com/Logitech/slimserver/blob/public/7.7/Changelog7.html";
 $changelog["7.9"] = "http://htmlpreview.github.io/?https://github.com/Logitech/slimserver/blob/public/7.9/Changelog7.html";
@@ -136,7 +116,6 @@ function showLatest($version, $fileList) {
 			if (preg_match("/\.exe$/", $best_file))             { $os = 'win'; }
 			elseif (preg_match("/\.msi/", $best_file))          { $os = 'whs'; }
 
-			elseif (preg_match("/Monterey-.*pkg/", $best_file)) { $os = 'osx-ng'; }
 			elseif (preg_match("/\.pkg/", $best_file))          { $os = 'osx'; }
 
 			elseif (preg_match("/amd64\.deb/", $best_file))     { $os = 'debamd64'; }
@@ -144,10 +123,6 @@ function showLatest($version, $fileList) {
 			elseif (preg_match("/i386\.deb/", $best_file))      { $os = 'debi386'; }
 			elseif (preg_match("/all\.deb/", $best_file))       { $os = 'deb'; }
 			elseif (preg_match("/\.rpm/", $best_file))          { $os = 'rpm'; }
-
-			elseif (preg_match("/sparc-readynas/", $best_file)) { $os = 'readynas'; }
-			elseif (preg_match("/arm-readynas/", $best_file))   { $os = 'readynasarm'; }
-			elseif (preg_match("/i386-readynas/", $best_file))  { $os = 'readynaspro'; }
 
 			elseif (preg_match("/arm-linux\.tgz/", $best_file)) { $os = 'tararm'; }
 			elseif (preg_match("/noCPAN/", $best_file))         { $os = 'nocpan'; }
@@ -174,12 +149,12 @@ function showLatest($version, $fileList) {
 			## If time difference is less than 24 hours, background is green
 			## If localtime() is more than 25 hours greater than $best_mtime, then set the color to orange
 			$localtime = time();
-			$oneday = (60 * 60 * 24);
-			$twoday = (60 * 60 * 48);
+			$middleaged = (60 * 60 * 24 * 7);
+			$oldish = (60 * 60 * 24 * 30);
 
-			if (($localtime - $best_mtime) > $twoday) {
+			if (($localtime - $best_mtime) > $oldish) {
 				$pretty_date_color = "red";
-			} elseif (($localtime - $best_mtime) > $oneday) {
+			} elseif (($localtime - $best_mtime) > $middleaged) {
 				$pretty_date_color = "orange";
 			} else {
 				$pretty_date_color = "black";
@@ -235,7 +210,7 @@ function print_footer() {
 		print "</servers>";
 	}
 	else {
-		print "<p><hr><p><a href=\"index.php\">Other Versions</a></BODY></HTML>";
+		print "<p><hr><p><a href=\"/\">Release Version</a> | <a href=\"index.php\">Other Versions</a></BODY></HTML>";
 	}
 }
 
