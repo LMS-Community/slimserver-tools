@@ -3,7 +3,8 @@
 ## Array of possible file names to search for
 # LMS
 $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\.exe/"] = "Logitech Media Server: Windows Executable Installer";
-$fileList["/.*\/LogitechMediaServer-.*-[0-9]+\-whs.msi/"] = "Logitech Media Server: Windows Home Server Installer";
+#$fileList["/.*\/LogitechMediaServer-.*-[0-9]+\-whs.msi/"] = "Logitech Media Server: Windows Home Server Installer";
+$fileList["/.*\/LogitechMediaServer-.*-[0-9]+\-win64.zip/"] = "Logitech Media Server: Windows 64-bit - <b>EXPERIMENTAL: requires <a href=\"https://strawberryperl.com\">Strawberry Perl 5.32</a>!</b> (<a href=\"https://strawberryperl.com/download/5.32.1.1/strawberry-perl-5.32.1.1-64bit.msi\">download</a>)";
 $fileList["/.*\/LogitechMediaServer-[0-9.]*-[0-9]+\.pkg/"] = "Logitech Media Server: Mac OSX Installer";
 // $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\.dmg/"] = "Logitech Media Server: Mac OSX Installer";
 $fileList["/.*\/logitechmediaserver-.*-[0-9]+\.tgz/"] = "Logitech Media Server: Unix Tarball (i386, x86_64, i386 FreeBSD, ARM EABI, PowerPC)";
@@ -115,6 +116,7 @@ function showLatest($version, $fileList) {
 
 			if (preg_match("/\.exe$/", $best_file))             { $os = 'win'; }
 			elseif (preg_match("/\.msi/", $best_file))          { $os = 'whs'; }
+			elseif (preg_match("/win64\.zip/", $best_file))     { $os = 'win64'; }
 
 			elseif (preg_match("/\.pkg/", $best_file))          { $os = 'osx'; }
 
