@@ -2,6 +2,7 @@
 
 ## Array of possible file names to search for
 # LMS
+$fileList["/.*\/LogitechMediaServer-.*-[0-9]+\-win64.exe/"] = "Logitech Media Server: Windows 64-bit Executable Installer - <b>EXPERIMENTAL!</b>";
 $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\.exe/"] = "Logitech Media Server: Windows Executable Installer";
 #$fileList["/.*\/LogitechMediaServer-.*-[0-9]+\-whs.msi/"] = "Logitech Media Server: Windows Home Server Installer";
 $fileList["/.*\/LogitechMediaServer-.*-[0-9]+\-win64.zip/"] = "Logitech Media Server: Windows 64-bit - <b>EXPERIMENTAL: requires <a href=\"https://strawberryperl.com\">Strawberry Perl 5.32</a>!</b> (<a href=\"https://strawberryperl.com/download/5.32.1.1/strawberry-perl-5.32.1.1-64bit.msi\">download</a>)";
