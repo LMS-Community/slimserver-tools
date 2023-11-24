@@ -109,15 +109,16 @@ function showLatest($version, $fileList) {
 		if ($fileFound !== 1) {
 			#print "<TD>&nbsp;</TD><TD>&nbsp;</TD>";
 		} elseif ($_GET["xml"]) {
-			$os = 'default';
+			$os = '';
 
 			preg_match("/[-_](\d+\.\d+\.\d+).*?(\d{10})/", $best_file, $matches);
 			$version = $matches[1];
 			$revision = $matches[2];
 
-			if (preg_match("/\.exe$/", $best_file))             { $os = 'win'; }
+			if (preg_match("/win64\.exe/", $best_file))         { $os = 'win64'; }
+			elseif (preg_match("/\.exe$/", $best_file))          { $os = 'win'; }
 			elseif (preg_match("/\.msi/", $best_file))          { $os = 'whs'; }
-			elseif (preg_match("/win64\.zip/", $best_file))     { $os = 'win64'; }
+			// elseif (preg_match("/win64\.zip/", $best_file))     { $os = ''; }
 
 			elseif (preg_match("/\.pkg/", $best_file))          { $os = 'osx'; }
 
@@ -131,7 +132,9 @@ function showLatest($version, $fileList) {
 			elseif (preg_match("/noCPAN/", $best_file))         { $os = 'nocpan'; }
 			elseif (preg_match("/\d+\.tgz/", $best_file))       { $os = 'src'; }
 
-			print("<$os revision=\"$revision\" url=\"http://downloads.slimdevices.com/nightly/$best_file\" version=\"$version\"/>");
+			if ($os) {
+				print("<$os revision=\"$revision\" url=\"http://downloads.slimdevices.com/nightly/$best_file\" version=\"$version\"/>");
+			}
 		} else {
 			print("<TR>\n");
 			print("<TD align=left>$pretty_desc</TD>\n");
