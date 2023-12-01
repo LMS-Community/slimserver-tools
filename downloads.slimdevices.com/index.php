@@ -98,6 +98,7 @@ function showLatest($version, $fileList) {
 				if ($stats['mtime'] > $best_mtime) {
 					## Rest best_mtime now with the new highest #
 					$best_mtime = $stats['mtime'];
+					$pretty_size = ByteSize($stats['size']);
 
 					## Set the best matchin file name so far
 					$best_file = $file;
@@ -133,7 +134,7 @@ function showLatest($version, $fileList) {
 			elseif (preg_match("/\d+\.tgz/", $best_file))       { $os = 'src'; }
 
 			if ($os) {
-				print("<$os revision=\"$revision\" url=\"http://downloads.slimdevices.com/nightly/$best_file\" version=\"$version\"/>");
+				print("<$os revision=\"$revision\" url=\"http://downloads.slimdevices.com/nightly/$best_file\" version=\"$version\" size=\"$pretty_size\"/>");
 			}
 		} else {
 			print("<TR>\n");
@@ -145,7 +146,6 @@ function showLatest($version, $fileList) {
 
 			## Get a pretty date
 			$pretty_date = date ("F d Y H:i", $best_mtime);
-			$pretty_size = ByteSize($stats['size']);
 
 			## Ok, at this point we have the best match... now print out some pretty HTML for our users
 			print("<TD align=left><a href=\"$best_file\">$pretty_file_name</a></TD>\n");
