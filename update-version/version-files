@@ -72,6 +72,7 @@
 ../../platforms/readynas/addon_template/SQUEEZEBOX.xml
 ../../platforms/redhat/squeezeboxserver.spec
 ../../platforms/win32/installer/SqueezeCenter.iss
+../../platforms/win32/installer/SqueezeCenterX64.iss
 ../../platforms/win32/installer/SqueezeCenter.wxs
 ../../server/HTML/EN/html/softsqueeze/index.html
 ../../server/strings.txt
