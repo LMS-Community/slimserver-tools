@@ -79,12 +79,16 @@
 // Version 1.11
 // Fix to stop socketwrapper not shutting down properly when input from stdin and output pipe is closed.
 //
+// ++++++
+// Version 1.12
+// Fix to limit the watchdog on remote stream read. The watchdog will no longer stop the worker thread
+// when waiting for LMS to read data.
+//
 
 #include <process.h>
 #include "stdafx.h"
 #include "getopt.h"
-
-#define	 SW_ID			  "Socketwrapper 1.11beta\n"
+#define	 SW_ID			  "Socketwrapper 1.12beta\n"
 
 // defines & global vars for extra thread mode
 #define  MAX_STEPS        16
@@ -105,6 +109,7 @@ typedef struct
 	HANDLE hInput;			// input handle for process/thread
 	HANDLE hOutput;			// output handle for process/thread
 	DWORD WatchDog;			// watchdog for worker threads
+	BOOL bIsWriting;        // true when stage thread is writing back to LMS server
 	DWORD nBlocks;			// number of "blocks" read
 	DWORD nBytes;			// number of bytes read
 } Stage;
@@ -212,6 +217,7 @@ unsigned __stdcall MoveDataThreadProc(void *pv)
 		}
 
 		// wait for some data from input
+		pS->bIsWriting = false;
 		if( !ReadFile(pS->hInput, pS->pBuff, BUFFER_SIZE, &bytesread, NULL) ) {
 			stderrMsg ( "MoveDataThreadProc for step %i failed reading with error %i.\n", pS->i, GetLastError() );
 			break;
@@ -236,6 +242,7 @@ unsigned __stdcall MoveDataThreadProc(void *pv)
 		}
 
 		// pass data to output
+		pS->bIsWriting = true;
 		if (!pS->fOutputIsSocket){
 			if( !WriteFile(pS->hOutput, pS->pBuff, bytesread, &byteswritten, NULL) ) {
 				stderrMsg ( "MoveDataThreadProc for step %i failed WriteFile with error %i.\n", pS->i, GetLastError() );
@@ -261,6 +268,7 @@ unsigned __stdcall MoveDataThreadProc(void *pv)
 	}
 
 
+	pS->bIsWriting = false;
 	debugMsg ( "MoveDataThreadProc for step %i ending.\n", pS->i );
 	if (!pS->fOutputIsSocket) {
 		if (!FlushFileBuffers(pS->hOutput)) {
@@ -596,7 +604,7 @@ DWORD main(int argc, char **argv)
 			fDie = true;
 		}
 		for( int i=0; i<numSteps; ++i ){
-			if( info[i].fIsWorkerThread ){
+			if (info[i].fIsWorkerThread && (!info[i].bIsWriting || info[i].fOutputIsSocket))
 				if( 0==info[i].WatchDog ) {
 					stderrMsg( "Watchdog expired - Thread for step %i stalled.\n", i );
 					if (bWatchdogEnabled)	fDie = true;
