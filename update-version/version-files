@@ -65,19 +65,11 @@
 ../../platforms/osx/Preference Pane/Swedish.lproj/Pref.nib/designable.nib
 ../../platforms/osx/Preference Pane/SqueezeCenter.xcodeproj/project.pbxproj
 ../../platforms/osx/Preference Pane/Info.plist
-../../platforms/solaris/makeit.sh
-../../platforms/readynas/addon_template/addons.conf
-../../platforms/readynas/addon_template/SQUEEZEBOX_AVAILABLE.xml
-../../platforms/readynas/addon_template/SQUEEZEBOX_CURRENT.xml
-../../platforms/readynas/addon_template/SQUEEZEBOX.xml
-../../platforms/redhat/squeezeboxserver.spec
 ../../platforms/win32/installer/SqueezeCenter.iss
 ../../platforms/win32/installer/SqueezeCenterX64.iss
-../../platforms/win32/installer/SqueezeCenter.wxs
-../../server/HTML/EN/html/softsqueeze/index.html
 ../../server/strings.txt
 ../../server/cleanup.pl
 ../../server/scanner.pl
 ../../server/slimserver.pl
-../../server/slimservice.pl
 ../../server/Slim/bootstrap.pm
+../../server/.github/actions/build/action.yaml
