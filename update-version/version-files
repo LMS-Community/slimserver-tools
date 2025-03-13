@@ -65,6 +65,7 @@
 ../../platforms/osx/Preference Pane/Swedish.lproj/Pref.nib/designable.nib
 ../../platforms/osx/Preference Pane/SqueezeCenter.xcodeproj/project.pbxproj
 ../../platforms/osx/Preference Pane/Info.plist
+../../platforms/osx/MenuBarItem/LMSMenu.json
 ../../platforms/win32/installer/SqueezeCenter.iss
 ../../platforms/win32/installer/SqueezeCenterX64.iss
 ../../server/strings.txt
