@@ -13,56 +13,27 @@ use constant CONCATENATED_TOKENS => qw(
 	NAPSTER_ERROR_\d+
 	PLUGIN_RANDOM.*(?:WEB|DISABLE|ITEM|PLAYING)
 	PLUGIN_FAVORITES_.*(?:ERROR|NO[A-Z]+)$
+	PLUGIN_SOUNDS_.*
+	^RADIOTIME_[LMNPSTW].*
+	PLUGIN_EXTENDED_BROWSEMODES_.*
+	SETUP_EXTENSIONS_CATEGORY_.*
+	SETUP_EXTENSIONS_AUTHOR
+	SETUP_EXTENSIONS_OTHER_REPOSITORIES
+	SETUP_EXTENSIONS_RECOMMENDED_REPOSITORIES
+	PLUGIN_RSSNEWS_.*
+	PLUGIN_SCREENSAVER_SNOW_WORD_.*
+	PLUGIN.*_MISSING_CREDS
+	SETUP_DEFEAT_DESTRUCTIVE_TTP_.*
 	SPOTIFY_ERROR_\d+
 	TZ_.+
 	UPDATING_FIRMWARE_.+
 	WELCOME_TO_.+
 	WIMP_GENRE_.+
-	-- from lib/Net/Pandora
-	PANDORA_INTERNAL_ERROR
-	PANDORA_MAINTENANCE_MODE
-	PANDORA_URL_PARAM_MISSING_METHOD
-	PANDORA_URL_PARAM_MISSING_AUTH_TOKEN
-	PANDORA_URL_PARAM_MISSING_PARTNER_ID
-	PANDORA_URL_PARAM_MISSING_USER_ID
-	PANDORA_SECURE_PROTOCOL_REQUIRED
-	PANDORA_CERTIFICATE_REQUIRED
-	PANDORA_PARAMETER_TYPE_MISMATCH
-	PANDORA_PARAMETER_MISSING
-	PANDORA_PARAMETER_VALUE_INVALID
-	PANDORA_API_VERSION_NOT_SUPPORTED
-	PANDORA_LICENSING_RESTRICTIONS
-	PANDORA_READ_ONLY_MODE
-	PANDORA_INVALID_AUTH_TOKEN
-	PANDORA_INVALID_LOGIN
-	PANDORA_USER_NOT_ACTIVE
-	PANDORA_USER_NOT_AUTHORIZED
-	PANDORA_MAX_STATIONS_REACHED
-	PANDORA_STATION_DOES_NOT_EXIST
-	PANDORA_COMPLIMENTARY_PERIOD_ALREADY_IN_USE
-	PANDORA_CALL_NOT_ALLOWED
-	PANDORA_DEVICE_NOT_FOUND
-	PANDORA_PARTNER_NOT_AUTHORIZED
-	PANDORA_INVALID_USERNAME
-	PANDORA_INVALID_PASSWORD
-	PANDORA_USERNAME_ALREADY_EXISTS
-	PANDORA_DEVICE_ALREADY_ASSOCIATED_TO_ACCOUNT
-	PANDORA_DEVICE_METADATA_TOO_LONG
-	PANDORA_INVALID_EMAIL_ADDRESS
-	PANDORA_STATION_NAME_TOO_LONG
-	PANDORA_EXPLICIT_PIN_INCORRECT
-	PANDORA_EXPLICIT_CONTENT_FILTER_NOT_ENABLED
-	PANDORA_EXPLICIT_PIN_MALFORMED
-	PANDORA_EXPLICIT_PIN_NOT_SET
-	PANDORA_EXPLICIT_PIN_ALREADY_SET
-	PANDORA_DEVICE_MODEL_INVALID
-	PANDORA_ZIP_CODE_INVALID
-	PANDORA_BIRTH_YEAR_INVALID
-	PANDORA_BIRTH_YEAR_TOO_YOUNG
-	PANDORA_INVALID_GENDER
-	PANDORA_INVALID_COUNTRY_CODE
-	PANDORA_USER_NOT_FOUND
-	PANDORA_INVALID_AD_TOKEN
+	ALARM_SHORT_DAY_\d
+	[A-Z0-9_]+_PROGRESS
+	DECODE_ERROR_\d+
+	RELEASE_TYPE_.+
+	[A-Z0-9_]+_SKIN
 );
 
 use constant SOURCE_CACHE => 'sourceCache.bin';
@@ -81,8 +52,8 @@ if ($cacheSourceData) {
 	eval {
 		require Storable;
 	};
-	
-	$cacheSourceData = 0 if $@; 
+
+	$cacheSourceData = 0 if $@;
 }
 
 if (!`ack`) {
@@ -161,8 +132,8 @@ if (!keys %sourceLines) {
 	open SC, "ack --perl --html --lua --tt --xml --nosmart-case -oh \"\\b[A-Z][A-Z_\\d]{2,}\\b\" $sourceDirs |";
 	while (<SC>) {
 		# remove newline chars and trailing tabs/spaces
-		chomp; s/[\t\s]+$//; 
-	
+		chomp; s/[\t\s]+$//;
+
 		$sourceLines{$_}++;
 	}
 }
@@ -188,7 +159,7 @@ foreach (keys %stringTokens) {
 		delete $stringTokens{$_};
 		delete $sourceLines{$_};     # thanks - we no longer need you
 	}
-	
+
 	delete $stringTokens{$_} if $_ =~ $ignoreRegex;
 }
 
@@ -201,8 +172,8 @@ sub getStringsFiles {
 		wanted => sub {
 			my $file = $File::Find::name;
 			my $path = $File::Find::dir;
-	
-			if ($file =~ /strings\.txt$/ 
+
+			if ($file =~ /strings\.txt$/
 				&& $path !~ /\.(?:svn|git)/
 #				&& $path !~ /slimserver-strings/
 				&& $path !~ /Plugins/) {
@@ -245,15 +216,15 @@ on your system and can be found in the default paths.
 ";
 		exit;
 	}
-	
-	# parse dirs by spaces 
+
+	# parse dirs by spaces
 	my @dirs = ( '.' );
 	if ($dirstring) {
 		@dirs = split/\s+/, $dirstring;
 	}
 
 	$stringDirs = \@dirs;
-	
+
 	$sourceDirs ||= '';
 }
 
